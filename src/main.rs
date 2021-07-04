@@ -9,7 +9,7 @@ fn main() {
     let opts: Opts = Opts::parse();
 
     match opts.script {
-        Some(path) => {}
+        Some(path) => runner::eval_file(&path),
         None => repl::repl().unwrap(),
     }
 }
