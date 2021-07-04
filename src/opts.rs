@@ -5,5 +5,5 @@ use clap::{AppSettings, Clap};
 #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Opts {
     /// File path for script to be run
-    pub script: String,
+    pub script: Option<String>,
 }
