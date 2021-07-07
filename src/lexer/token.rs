@@ -57,10 +57,10 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, lexeme: String, line: usize) -> Self {
+    pub fn new(r#type: TokenType, lexeme: &str, line: usize) -> Self {
         Self {
             r#type,
-            lexeme,
+            lexeme: String::from(lexeme),
             line,
         }
     }

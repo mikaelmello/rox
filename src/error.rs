@@ -9,7 +9,4 @@ pub enum RoxError {
 
     #[error("Syntax error at line {0}: {1}")]
     SyntaxError(usize, String),
-
-    #[error("Unknown error")]
-    Unknown,
 }

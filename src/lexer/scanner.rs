@@ -1,20 +1,10 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufReader, Bytes, Read, Seek},
-    sync::{Arc, RwLock},
-};
+use std::io::{BufReader, Bytes, Read, Seek};
 
 use unicode_reader::{CodePoints, Graphemes};
 
 use crate::error::RoxError;
 
 use super::token::{Token, TokenType};
-
-enum CodeSource {
-    File(File),
-    String(String),
-}
 
 fn reserved_token(lexeme: &str) -> Option<TokenType> {
     match lexeme {
@@ -67,11 +57,13 @@ impl<T: Read + Seek> Scanner<T> {
             }
         }
 
+        tokens.push(Token::new(TokenType::Eof, "", self.line));
+
         Ok(tokens)
     }
 
     fn build_token(&self, r#type: TokenType) -> Token {
-        Token::new(r#type, self.cur.clone(), self.line)
+        Token::new(r#type, &self.cur, self.line)
     }
 
     fn next_token(&mut self) -> Result<Option<Token>, RoxError> {
@@ -279,7 +271,7 @@ mod test {
         };
 
         ($type:expr,$lexeme:expr,$line:expr) => {
-            Token::new($type, String::from($lexeme), $line)
+            Token::new($type, $lexeme, $line)
         };
     }
 
