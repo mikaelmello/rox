@@ -22,7 +22,7 @@ pub fn repl() -> io::Result<()> {
 
         let result = runner::eval(&buffer);
 
-        write!(stdout, "{}", result)?;
+        write!(stdout, "{}\n", result)?;
     }
     Ok(())
 }
