@@ -264,3 +264,130 @@ impl<T: Read + Seek> Scanner<T> {
         self.graphemes.next().transpose().map_err(RoxError::from)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::Cursor;
+
+    use crate::lexer::token::{Token, TokenType};
+
+    use super::Scanner;
+
+    macro_rules! token {
+        ($type:expr,$lexeme:expr) => {
+            token!($type, $lexeme, 0)
+        };
+
+        ($type:expr,$lexeme:expr,$line:expr) => {
+            Token::new($type, String::from($lexeme), $line)
+        };
+    }
+
+    macro_rules! test {
+        ($name:ident,$input:expr,$output:expr) => {
+            #[test]
+            fn $name() {
+                let cursor = Cursor::new($input);
+
+                let tokens = Scanner::from(cursor)
+                    .and_then(Scanner::scan_tokens)
+                    .unwrap();
+
+                assert_eq!($output, tokens);
+            }
+        };
+    }
+
+    test!(
+        single_chars,
+        "(){},-.;+*",
+        vec![
+            token!(TokenType::LeftParen, "("),
+            token!(TokenType::RightParen, ")"),
+            token!(TokenType::LeftBrace, "{"),
+            token!(TokenType::RightBrace, "}"),
+            token!(TokenType::Comma, ","),
+            token!(TokenType::Minus, "-"),
+            token!(TokenType::Dot, "."),
+            token!(TokenType::Semicolon, ";"),
+            token!(TokenType::Plus, "+"),
+            token!(TokenType::Star, "*"),
+        ]
+    );
+
+    test!(
+        single_chars_repeated,
+        "(){}**--,-.;+*",
+        vec![
+            token!(TokenType::LeftParen, "("),
+            token!(TokenType::RightParen, ")"),
+            token!(TokenType::LeftBrace, "{"),
+            token!(TokenType::RightBrace, "}"),
+            token!(TokenType::Star, "*"),
+            token!(TokenType::Star, "*"),
+            token!(TokenType::Minus, "-"),
+            token!(TokenType::Minus, "-"),
+            token!(TokenType::Comma, ","),
+            token!(TokenType::Minus, "-"),
+            token!(TokenType::Dot, "."),
+            token!(TokenType::Semicolon, ";"),
+            token!(TokenType::Plus, "+"),
+            token!(TokenType::Star, "*"),
+        ]
+    );
+
+    test!(
+        strings,
+        "\"singleword\"",
+        vec![token!(
+            TokenType::String("singleword".into()),
+            "\"singleword\""
+        )]
+    );
+
+    test!(
+        strings_and_chars_and_lines,
+        "var x = \"singleword\"\n{}",
+        vec![
+            token!(TokenType::Var, "var", 0),
+            token!(TokenType::Identifier("x".into()), "x", 0),
+            token!(TokenType::Equal, "=", 0),
+            token!(TokenType::String("singleword".into()), "\"singleword\"", 0),
+            token!(TokenType::LeftBrace, "{", 1),
+            token!(TokenType::RightBrace, "}", 1)
+        ]
+    );
+
+    test!(
+        strings_and_chars_and_lines_extended,
+        "var x = \"singleword\";\nvar y = 2 + 3.;\nif (y >= 5.42 or y < 0.0000) quit();",
+        vec![
+            token!(TokenType::Var, "var", 0),
+            token!(TokenType::Identifier("x".into()), "x", 0),
+            token!(TokenType::Equal, "=", 0),
+            token!(TokenType::String("singleword".into()), "\"singleword\"", 0),
+            token!(TokenType::Semicolon, ";", 0),
+            token!(TokenType::Var, "var", 1),
+            token!(TokenType::Identifier("y".into()), "y", 1),
+            token!(TokenType::Equal, "=", 1),
+            token!(TokenType::Number(2f64), "2", 1),
+            token!(TokenType::Plus, "+", 1),
+            token!(TokenType::Number(3f64), "3.", 1),
+            token!(TokenType::Semicolon, ";", 1),
+            token!(TokenType::If, "if", 2),
+            token!(TokenType::LeftParen, "(", 2),
+            token!(TokenType::Identifier("y".into()), "y", 2),
+            token!(TokenType::GreaterEqual, ">=", 2),
+            token!(TokenType::Number(5.42f64), "5.42", 2),
+            token!(TokenType::Or, "or", 2),
+            token!(TokenType::Identifier("y".into()), "y", 2),
+            token!(TokenType::Less, "<", 2),
+            token!(TokenType::Number(0f64), "0.0000", 2),
+            token!(TokenType::RightParen, ")", 2),
+            token!(TokenType::Identifier("quit".into()), "quit", 2),
+            token!(TokenType::LeftParen, "(", 2),
+            token!(TokenType::RightParen, ")", 2),
+            token!(TokenType::Semicolon, ";", 2),
+        ]
+    );
+}
