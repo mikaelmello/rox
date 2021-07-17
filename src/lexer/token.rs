@@ -1,3 +1,5 @@
+use super::location::Location;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
@@ -53,15 +55,15 @@ pub enum TokenType {
 pub struct Token {
     r#type: TokenType,
     lexeme: String,
-    line: usize,
+    loc: Location,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, lexeme: &str, line: usize) -> Self {
+    pub fn new(r#type: TokenType, lexeme: &str, loc: Location) -> Self {
         Self {
             r#type,
             lexeme: String::from(lexeme),
-            line,
+            loc,
         }
     }
 }

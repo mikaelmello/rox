@@ -1,10 +1,10 @@
-use std::io::{BufReader, Bytes, Read, Seek};
-
-use unicode_reader::{CodePoints, Graphemes};
-
+use super::{
+    location::Location,
+    token::{Token, TokenType},
+};
 use crate::error::RoxError;
-
-use super::token::{Token, TokenType};
+use std::io::{BufReader, Bytes, Read, Seek};
+use unicode_reader::{CodePoints, Graphemes};
 
 fn reserved_token(lexeme: &str) -> Option<TokenType> {
     match lexeme {
@@ -29,9 +29,9 @@ fn reserved_token(lexeme: &str) -> Option<TokenType> {
 }
 
 pub struct Scanner<T: Read + Seek> {
-    graphemes: Graphemes<CodePoints<Bytes<BufReader<T>>>>,
-    line: usize,
-    buffer: Option<String>,
+    inp: Graphemes<CodePoints<Bytes<BufReader<T>>>>,
+    loc: Location,
+    buf: Option<String>,
     cur: String,
 }
 
@@ -41,9 +41,9 @@ impl<T: Read + Seek> Scanner<T> {
         let graphemes = Graphemes::from(reader);
 
         Ok(Self {
-            graphemes,
-            line: 0,
-            buffer: None,
+            inp: graphemes,
+            loc: Location::default(),
+            buf: None,
             cur: String::new(),
         })
     }
@@ -57,17 +57,18 @@ impl<T: Read + Seek> Scanner<T> {
             }
         }
 
-        tokens.push(Token::new(TokenType::Eof, "", self.line));
+        tokens.push(Token::new(TokenType::Eof, "", self.loc));
 
         Ok(tokens)
     }
 
-    fn build_token(&self, r#type: TokenType) -> Token {
-        Token::new(r#type, &self.cur, self.line)
+    fn build_token(&self, r#type: TokenType, loc: Location) -> Token {
+        Token::new(r#type, &self.cur, loc)
     }
 
     fn next_token(&mut self) -> Result<Option<Token>, RoxError> {
         self.cur = String::new();
+        let loc = self.loc;
 
         let grapheme = match self.advance()? {
             Some(s) => s,
@@ -76,7 +77,7 @@ impl<T: Read + Seek> Scanner<T> {
 
         macro_rules! token {
             ($type:expr) => {
-                Ok(Some(self.build_token($type)))
+                Ok(Some(self.build_token($type, loc)))
             };
         }
 
@@ -113,23 +114,20 @@ impl<T: Read + Seek> Scanner<T> {
             }
             "/" => token!(TokenType::Slash),
 
-            "\n" => {
-                self.line = self.line.saturating_add(1);
-                Ok(None)
-            }
+            "\n" => Ok(None),
 
-            "\"" => return Ok(Some(self.string()?)),
-            g if Self::is_digit(g) => Ok(Some(self.number()?)),
-            g if Self::is_alpha(g) => Ok(Some(self.identifier()?)),
+            "\"" => return Ok(Some(self.string(loc)?)),
+            g if Self::is_digit(g) => Ok(Some(self.number(loc)?)),
+            g if Self::is_alpha(g) => Ok(Some(self.identifier(loc)?)),
             " " | "\r" | "\t" => Ok(None),
-            _ => Err(RoxError::SyntaxError(
-                self.line,
+            _ => Err(RoxError::LexicalError(
                 format!("Invalid character {}", grapheme),
+                loc,
             )),
         }
     }
 
-    fn identifier(&mut self) -> Result<Token, RoxError> {
+    fn identifier(&mut self, start_loc: Location) -> Result<Token, RoxError> {
         while let Some(c) = self.peek()? {
             if Self::is_alpha_numeric(c) {
                 self.advance()?;
@@ -139,13 +137,13 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if let Some(reserved) = reserved_token(&self.cur) {
-            Ok(self.build_token(reserved))
+            Ok(self.build_token(reserved, start_loc))
         } else {
-            Ok(self.build_token(TokenType::Identifier(self.cur.clone())))
+            Ok(self.build_token(TokenType::Identifier(self.cur.clone()), start_loc))
         }
     }
 
-    fn number(&mut self) -> Result<Token, RoxError> {
+    fn number(&mut self, start_loc: Location) -> Result<Token, RoxError> {
         while let Some(c) = self.peek()? {
             if Self::is_digit(c) {
                 self.advance()?;
@@ -165,26 +163,22 @@ impl<T: Read + Seek> Scanner<T> {
             }
         }
 
-        let literal = self
-            .cur
-            .parse::<f64>()
-            .map_err(|_| RoxError::SyntaxError(self.line, "Invalid number literal".to_string()))?;
+        let literal = self.cur.parse::<f64>().map_err(|_| {
+            RoxError::LexicalError(
+                format!("{} is not a valid number literal", self.cur),
+                start_loc,
+            )
+        })?;
 
-        Ok(self.build_token(TokenType::Number(literal)))
+        Ok(self.build_token(TokenType::Number(literal), start_loc))
     }
 
-    fn string(&mut self) -> Result<Token, RoxError> {
-        let initial_line = self.line;
-        let mut cur_line = initial_line;
+    fn string(&mut self, start_loc: Location) -> Result<Token, RoxError> {
         let mut literal = String::new();
 
         while let Some(c) = self.peek()? {
             if c == "\"" {
                 break;
-            }
-
-            if c == "\n" {
-                cur_line = cur_line.saturating_add(1);
             }
 
             literal.push_str(c);
@@ -193,20 +187,19 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if self.peek()? != Some("\"") {
-            return Err(RoxError::SyntaxError(
-                initial_line,
+            return Err(RoxError::LexicalError(
                 "Unterminated string".to_string(),
+                start_loc,
             ));
         }
 
-        self.line = cur_line;
         self.advance()?;
 
-        Ok(self.build_token(TokenType::String(literal)))
+        Ok(self.build_token(TokenType::String(literal), start_loc))
     }
 
     fn advance(&mut self) -> Result<Option<String>, RoxError> {
-        match self.buffer.take() {
+        let res = match self.buf.take() {
             None => match self.next()? {
                 Some(g) => {
                     self.cur.push_str(&g);
@@ -218,15 +211,26 @@ impl<T: Read + Seek> Scanner<T> {
                 self.cur.push_str(&s);
                 Ok(Some(s))
             }
+        };
+
+        if let Ok(Some(s)) = &res {
+            if "\n" == s {
+                self.loc.lf();
+                self.loc.cr();
+            } else {
+                self.loc.next();
+            }
         }
+
+        res
     }
 
     fn peek(&mut self) -> Result<Option<&str>, RoxError> {
-        if self.buffer.is_none() {
-            self.buffer = self.next()?;
+        if self.buf.is_none() {
+            self.buf = self.next()?;
         }
 
-        Ok(self.buffer.as_deref())
+        Ok(self.buf.as_deref())
     }
 
     fn peek_match(&mut self, expected: &str) -> Result<bool, RoxError> {
@@ -253,7 +257,7 @@ impl<T: Read + Seek> Scanner<T> {
     }
 
     fn next(&mut self) -> Result<Option<String>, RoxError> {
-        self.graphemes.next().transpose().map_err(RoxError::from)
+        self.inp.next().transpose().map_err(RoxError::from)
     }
 }
 
@@ -263,15 +267,16 @@ mod test {
 
     use crate::lexer::token::{Token, TokenType};
 
+    use super::Location;
     use super::Scanner;
 
     macro_rules! token {
         ($type:expr,$lexeme:expr) => {
-            token!($type, $lexeme, 0)
+            token!($type, $lexeme, Location::default())
         };
 
-        ($type:expr,$lexeme:expr,$line:expr) => {
-            Token::new($type, $lexeme, $line)
+        ($type:expr,$lexeme:expr,$loc:expr) => {
+            Token::new($type, $lexeme, Location::from($loc))
         };
     }
 
@@ -285,7 +290,10 @@ mod test {
                     .and_then(Scanner::scan_tokens)
                     .unwrap();
 
-                assert_eq!($output, tokens);
+                for (idx, t) in tokens.iter().enumerate() {
+                    let ot = &$output[idx];
+                    assert_eq!(ot, t);
+                }
             }
         };
     }
@@ -294,16 +302,17 @@ mod test {
         single_chars,
         "(){},-.;+*",
         vec![
-            token!(TokenType::LeftParen, "("),
-            token!(TokenType::RightParen, ")"),
-            token!(TokenType::LeftBrace, "{"),
-            token!(TokenType::RightBrace, "}"),
-            token!(TokenType::Comma, ","),
-            token!(TokenType::Minus, "-"),
-            token!(TokenType::Dot, "."),
-            token!(TokenType::Semicolon, ";"),
-            token!(TokenType::Plus, "+"),
-            token!(TokenType::Star, "*"),
+            token!(TokenType::LeftParen, "(", (0, 0)),
+            token!(TokenType::RightParen, ")", (0, 1)),
+            token!(TokenType::LeftBrace, "{", (0, 2)),
+            token!(TokenType::RightBrace, "}", (0, 3)),
+            token!(TokenType::Comma, ",", (0, 4)),
+            token!(TokenType::Minus, "-", (0, 5)),
+            token!(TokenType::Dot, ".", (0, 6)),
+            token!(TokenType::Semicolon, ";", (0, 7)),
+            token!(TokenType::Plus, "+", (0, 8)),
+            token!(TokenType::Star, "*", (0, 9)),
+            token!(TokenType::Eof, "", (0, 10)),
         ]
     );
 
@@ -311,42 +320,52 @@ mod test {
         single_chars_repeated,
         "(){}**--,-.;+*",
         vec![
-            token!(TokenType::LeftParen, "("),
-            token!(TokenType::RightParen, ")"),
-            token!(TokenType::LeftBrace, "{"),
-            token!(TokenType::RightBrace, "}"),
-            token!(TokenType::Star, "*"),
-            token!(TokenType::Star, "*"),
-            token!(TokenType::Minus, "-"),
-            token!(TokenType::Minus, "-"),
-            token!(TokenType::Comma, ","),
-            token!(TokenType::Minus, "-"),
-            token!(TokenType::Dot, "."),
-            token!(TokenType::Semicolon, ";"),
-            token!(TokenType::Plus, "+"),
-            token!(TokenType::Star, "*"),
+            token!(TokenType::LeftParen, "(", (0, 0)),
+            token!(TokenType::RightParen, ")", (0, 1)),
+            token!(TokenType::LeftBrace, "{", (0, 2)),
+            token!(TokenType::RightBrace, "}", (0, 3)),
+            token!(TokenType::Star, "*", (0, 4)),
+            token!(TokenType::Star, "*", (0, 5)),
+            token!(TokenType::Minus, "-", (0, 6)),
+            token!(TokenType::Minus, "-", (0, 7)),
+            token!(TokenType::Comma, ",", (0, 8)),
+            token!(TokenType::Minus, "-", (0, 9)),
+            token!(TokenType::Dot, ".", (0, 10)),
+            token!(TokenType::Semicolon, ";", (0, 11)),
+            token!(TokenType::Plus, "+", (0, 12)),
+            token!(TokenType::Star, "*", (0, 13)),
+            token!(TokenType::Eof, "", (0, 14)),
         ]
     );
 
     test!(
         strings,
         "\"singleword\"",
-        vec![token!(
-            TokenType::String("singleword".into()),
-            "\"singleword\""
-        )]
+        vec![
+            token!(
+                TokenType::String("singleword".into()),
+                "\"singleword\"",
+                (0, 0)
+            ),
+            token!(TokenType::Eof, "", (0, 12)),
+        ]
     );
 
     test!(
         strings_and_chars_and_lines,
         "var x = \"singleword\"\n{}",
         vec![
-            token!(TokenType::Var, "var", 0),
-            token!(TokenType::Identifier("x".into()), "x", 0),
-            token!(TokenType::Equal, "=", 0),
-            token!(TokenType::String("singleword".into()), "\"singleword\"", 0),
-            token!(TokenType::LeftBrace, "{", 1),
-            token!(TokenType::RightBrace, "}", 1)
+            token!(TokenType::Var, "var", (0, 0)),
+            token!(TokenType::Identifier("x".into()), "x", (0, 4)),
+            token!(TokenType::Equal, "=", (0, 6)),
+            token!(
+                TokenType::String("singleword".into()),
+                "\"singleword\"",
+                (0, 8)
+            ),
+            token!(TokenType::LeftBrace, "{", (1, 0)),
+            token!(TokenType::RightBrace, "}", (1, 1)),
+            token!(TokenType::Eof, "", (1, 2)),
         ]
     );
 
@@ -354,32 +373,37 @@ mod test {
         strings_and_chars_and_lines_extended,
         "var x = \"singleword\";\nvar y = 2 + 3.;\nif (y >= 5.42 or y < 0.0000) quit();",
         vec![
-            token!(TokenType::Var, "var", 0),
-            token!(TokenType::Identifier("x".into()), "x", 0),
-            token!(TokenType::Equal, "=", 0),
-            token!(TokenType::String("singleword".into()), "\"singleword\"", 0),
-            token!(TokenType::Semicolon, ";", 0),
-            token!(TokenType::Var, "var", 1),
-            token!(TokenType::Identifier("y".into()), "y", 1),
-            token!(TokenType::Equal, "=", 1),
-            token!(TokenType::Number(2f64), "2", 1),
-            token!(TokenType::Plus, "+", 1),
-            token!(TokenType::Number(3f64), "3.", 1),
-            token!(TokenType::Semicolon, ";", 1),
-            token!(TokenType::If, "if", 2),
-            token!(TokenType::LeftParen, "(", 2),
-            token!(TokenType::Identifier("y".into()), "y", 2),
-            token!(TokenType::GreaterEqual, ">=", 2),
-            token!(TokenType::Number(5.42f64), "5.42", 2),
-            token!(TokenType::Or, "or", 2),
-            token!(TokenType::Identifier("y".into()), "y", 2),
-            token!(TokenType::Less, "<", 2),
-            token!(TokenType::Number(0f64), "0.0000", 2),
-            token!(TokenType::RightParen, ")", 2),
-            token!(TokenType::Identifier("quit".into()), "quit", 2),
-            token!(TokenType::LeftParen, "(", 2),
-            token!(TokenType::RightParen, ")", 2),
-            token!(TokenType::Semicolon, ";", 2),
+            token!(TokenType::Var, "var", (0, 0)),
+            token!(TokenType::Identifier("x".into()), "x", (0, 4)),
+            token!(TokenType::Equal, "=", (0, 6)),
+            token!(
+                TokenType::String("singleword".into()),
+                "\"singleword\"",
+                (0, 8)
+            ),
+            token!(TokenType::Semicolon, ";", (0, 20)),
+            token!(TokenType::Var, "var", (1, 0)),
+            token!(TokenType::Identifier("y".into()), "y", (1, 4)),
+            token!(TokenType::Equal, "=", (1, 6)),
+            token!(TokenType::Number(2f64), "2", (1, 8)),
+            token!(TokenType::Plus, "+", (1, 10)),
+            token!(TokenType::Number(3f64), "3.", (1, 12)),
+            token!(TokenType::Semicolon, ";", (1, 14)),
+            token!(TokenType::If, "if", (2, 0)),
+            token!(TokenType::LeftParen, "(", (2, 3)),
+            token!(TokenType::Identifier("y".into()), "y", (2, 4)),
+            token!(TokenType::GreaterEqual, ">=", (2, 6)),
+            token!(TokenType::Number(5.42f64), "5.42", (2, 9)),
+            token!(TokenType::Or, "or", (2, 14)),
+            token!(TokenType::Identifier("y".into()), "y", (2, 17)),
+            token!(TokenType::Less, "<", (2, 19)),
+            token!(TokenType::Number(0f64), "0.0000", (2, 21)),
+            token!(TokenType::RightParen, ")", (2, 27)),
+            token!(TokenType::Identifier("quit".into()), "quit", (2, 29)),
+            token!(TokenType::LeftParen, "(", (2, 33)),
+            token!(TokenType::RightParen, ")", (2, 34)),
+            token!(TokenType::Semicolon, ";", (2, 35)),
+            token!(TokenType::Eof, "", (2, 36)),
         ]
     );
 }
