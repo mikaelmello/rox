@@ -14,4 +14,6 @@ pub enum LexicalError {
     UnterminatedString(Location),
     #[error("Error with IO operations")]
     IO(#[from] io::Error),
+    #[error("Placeholder")]
+    Unknown,
 }

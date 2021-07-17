@@ -10,6 +10,7 @@ mod ast;
 mod error;
 mod lexer;
 mod opts;
+mod parser;
 mod repl;
 mod runner;
 
