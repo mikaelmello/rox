@@ -1,9 +1,10 @@
 use super::{
+    lexical_error::LexicalError,
     location::Location,
     token::{Token, TokenType},
 };
 use crate::error::RoxError;
-use std::io::{BufReader, Bytes, Read, Seek};
+use std::io::{self, BufReader, Bytes, Read, Seek};
 use unicode_reader::{CodePoints, Graphemes};
 
 fn reserved_token(lexeme: &str) -> Option<TokenType> {
@@ -33,6 +34,8 @@ pub struct Scanner<T: Read + Seek> {
     loc: Location,
     buf: Option<String>,
     cur: String,
+    errors: Vec<LexicalError>,
+    invalid_string: Option<(String, Location)>,
 }
 
 impl<T: Read + Seek> Scanner<T> {
@@ -45,6 +48,8 @@ impl<T: Read + Seek> Scanner<T> {
             loc: Location::default(),
             buf: None,
             cur: String::new(),
+            errors: vec![],
+            invalid_string: None,
         })
     }
 
@@ -60,6 +65,22 @@ impl<T: Read + Seek> Scanner<T> {
         tokens.push(Token::new(TokenType::Eof, "", self.loc));
 
         Ok(tokens)
+    }
+
+    fn error(&mut self, error: LexicalError) {
+        self.errors.push(error);
+    }
+
+    fn invalid_grapheme(&mut self, grapheme: &str, loc: Location) {
+        let invalid = match self.invalid_string.take() {
+            Some((mut string, loc)) => {
+                string.push_str(grapheme);
+                (string, loc)
+            }
+            None => (String::from(grapheme), loc),
+        };
+
+        self.invalid_string = Some(invalid);
     }
 
     fn build_token(&self, r#type: TokenType, loc: Location) -> Token {
@@ -116,18 +137,18 @@ impl<T: Read + Seek> Scanner<T> {
 
             "\n" => Ok(None),
 
-            "\"" => return Ok(Some(self.string(loc)?)),
-            g if Self::is_digit(g) => Ok(Some(self.number(loc)?)),
+            "\"" => return Ok(self.string(loc)?),
+            g if Self::is_digit(g) => Ok(self.number(loc)?),
             g if Self::is_alpha(g) => Ok(Some(self.identifier(loc)?)),
             " " | "\r" | "\t" => Ok(None),
-            _ => Err(RoxError::LexicalError(
-                format!("Invalid character {}", grapheme),
-                loc,
-            )),
+            g => {
+                self.invalid_grapheme(g, loc);
+                Ok(None)
+            }
         }
     }
 
-    fn identifier(&mut self, start_loc: Location) -> Result<Token, RoxError> {
+    fn identifier(&mut self, start_loc: Location) -> Result<Token, io::Error> {
         while let Some(c) = self.peek()? {
             if Self::is_alpha_numeric(c) {
                 self.advance()?;
@@ -143,7 +164,7 @@ impl<T: Read + Seek> Scanner<T> {
         }
     }
 
-    fn number(&mut self, start_loc: Location) -> Result<Token, RoxError> {
+    fn number(&mut self, start_loc: Location) -> Result<Option<Token>, io::Error> {
         while let Some(c) = self.peek()? {
             if Self::is_digit(c) {
                 self.advance()?;
@@ -163,17 +184,21 @@ impl<T: Read + Seek> Scanner<T> {
             }
         }
 
-        let literal = self.cur.parse::<f64>().map_err(|_| {
-            RoxError::LexicalError(
-                format!("{} is not a valid number literal", self.cur),
-                start_loc,
-            )
-        })?;
-
-        Ok(self.build_token(TokenType::Number(literal), start_loc))
+        match self.cur.parse::<f64>() {
+            Ok(literal) => Ok(Some(
+                self.build_token(TokenType::Number(literal), start_loc),
+            )),
+            Err(_) => {
+                self.error(LexicalError::InvalidNumberLiteral(
+                    self.cur.clone(),
+                    start_loc,
+                ));
+                Ok(None)
+            }
+        }
     }
 
-    fn string(&mut self, start_loc: Location) -> Result<Token, RoxError> {
+    fn string(&mut self, start_loc: Location) -> Result<Option<Token>, io::Error> {
         let mut literal = String::new();
 
         while let Some(c) = self.peek()? {
@@ -187,18 +212,18 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if self.peek()? != Some("\"") {
-            return Err(RoxError::LexicalError(
-                "Unterminated string".to_string(),
-                start_loc,
-            ));
+            self.error(LexicalError::UnterminatedString(start_loc));
+            return Ok(None);
         }
 
         self.advance()?;
 
-        Ok(self.build_token(TokenType::String(literal), start_loc))
+        Ok(Some(
+            self.build_token(TokenType::String(literal), start_loc),
+        ))
     }
 
-    fn advance(&mut self) -> Result<Option<String>, RoxError> {
+    fn advance(&mut self) -> Result<Option<String>, io::Error> {
         let res = match self.buf.take() {
             None => match self.next()? {
                 Some(g) => {
@@ -225,7 +250,7 @@ impl<T: Read + Seek> Scanner<T> {
         res
     }
 
-    fn peek(&mut self) -> Result<Option<&str>, RoxError> {
+    fn peek(&mut self) -> Result<Option<&str>, io::Error> {
         if self.buf.is_none() {
             self.buf = self.next()?;
         }
@@ -233,7 +258,7 @@ impl<T: Read + Seek> Scanner<T> {
         Ok(self.buf.as_deref())
     }
 
-    fn peek_match(&mut self, expected: &str) -> Result<bool, RoxError> {
+    fn peek_match(&mut self, expected: &str) -> Result<bool, io::Error> {
         if self.peek()? == Some(expected) {
             self.advance()?;
             Ok(true)
@@ -256,8 +281,8 @@ impl<T: Read + Seek> Scanner<T> {
         g.len() == 1 && g.chars().nth(0).unwrap() >= '0' && g.chars().nth(0).unwrap() <= '9'
     }
 
-    fn next(&mut self) -> Result<Option<String>, RoxError> {
-        self.inp.next().transpose().map_err(RoxError::from)
+    fn next(&mut self) -> Result<Option<String>, io::Error> {
+        self.inp.next().transpose()
     }
 }
 
