@@ -14,7 +14,7 @@ pub fn eval(expr: &str) -> String {
     let tokens = scanner.scan_tokens();
 
     match tokens {
-        Ok(t) => format!("{:?}", t),
+        Ok((tokens, errors)) => format!("{:?}\n{:?}", tokens, errors),
         Err(e) => format!("{}", e),
     }
 }

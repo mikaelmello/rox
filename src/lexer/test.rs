@@ -25,7 +25,7 @@ mod test {
                     .and_then(Scanner::scan_tokens)
                     .unwrap();
 
-                for (idx, t) in tokens.iter().enumerate() {
+                for (idx, t) in tokens.0.iter().enumerate() {
                     let ot = &$output[idx];
                     assert_eq!(ot, t);
                 }

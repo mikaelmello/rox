@@ -66,4 +66,8 @@ impl Token {
             loc,
         }
     }
+
+    pub fn r#type(&self) -> &TokenType {
+        &self.r#type
+    }
 }

@@ -4,17 +4,18 @@ use super::{
     location::Location,
     token::{Token, TokenType},
 };
-use crate::error::RoxError;
-use std::io::{self, BufReader, Bytes, Read, Seek};
+use crate::{error::RoxError, lexer::scan_result::ScanResult};
+use std::{
+    collections::VecDeque,
+    io::{self, BufReader, Bytes, Read, Seek},
+};
 use unicode_reader::{CodePoints, Graphemes};
 
 pub struct Scanner<T: Read + Seek> {
     inp: Graphemes<CodePoints<Bytes<BufReader<T>>>>,
     loc: Location,
-    buf: Option<String>,
+    buf: VecDeque<String>,
     cur: String,
-    errors: Vec<LexicalError>,
-    invalid_string: Option<(String, Location)>,
 }
 
 impl<T: Read + Seek> Scanner<T> {
@@ -25,109 +26,93 @@ impl<T: Read + Seek> Scanner<T> {
         Ok(Self {
             inp: graphemes,
             loc: Location::default(),
-            buf: None,
+            buf: VecDeque::new(),
             cur: String::new(),
-            errors: vec![],
-            invalid_string: None,
         })
     }
 
-    pub fn scan_tokens(mut self) -> Result<Vec<Token>, RoxError> {
+    pub fn scan_tokens(mut self) -> Result<(Vec<Token>, Vec<LexicalError>), RoxError> {
         let mut tokens = vec![];
-        while let Some(_) = self.peek()? {
-            match self.next_token()? {
-                Some(t) => tokens.push(t),
-                None => {}
-            }
+        let mut errors = vec![];
+
+        loop {
+            match self.next_token() {
+                Ok(token) => {
+                    if *token.r#type() == TokenType::Eof {
+                        tokens.push(token);
+                        break;
+                    }
+
+                    tokens.push(token);
+                }
+                Err(LexicalError::IO(err)) => return Err(RoxError::IO(err)),
+                Err(err) => errors.push(err),
+            };
         }
 
-        tokens.push(Token::new(TokenType::Eof, "", self.loc));
-
-        Ok(tokens)
-    }
-
-    fn error(&mut self, error: LexicalError) {
-        self.errors.push(error);
-    }
-
-    fn invalid_grapheme(&mut self, grapheme: &str, loc: Location) {
-        let invalid = match self.invalid_string.take() {
-            Some((mut string, loc)) => {
-                string.push_str(grapheme);
-                (string, loc)
-            }
-            None => (String::from(grapheme), loc),
-        };
-
-        self.invalid_string = Some(invalid);
+        Ok((tokens, errors))
     }
 
     fn build_token(&self, r#type: TokenType, loc: Location) -> Token {
         Token::new(r#type, &self.cur, loc)
     }
 
-    fn next_token(&mut self) -> Result<Option<Token>, RoxError> {
-        self.cur = String::new();
-        let loc = self.loc;
+    fn next_token(&mut self) -> ScanResult {
+        loop {
+            self.cur = String::new();
+            let loc = self.loc;
 
-        let grapheme = match self.advance()? {
-            Some(s) => s,
-            None => return Ok(None),
-        };
-
-        macro_rules! token {
-            ($type:expr) => {
-                Ok(Some(self.build_token($type, loc)))
-            };
-        }
-
-        match &grapheme[..] {
-            "(" => token!(TokenType::LeftParen),
-            ")" => token!(TokenType::RightParen),
-            "{" => token!(TokenType::LeftBrace),
-            "}" => token!(TokenType::RightBrace),
-            "," => token!(TokenType::Comma),
-            "." => token!(TokenType::Dot),
-            "-" => token!(TokenType::Minus),
-            "+" => token!(TokenType::Plus),
-            ";" => token!(TokenType::Semicolon),
-            "*" => token!(TokenType::Star),
-
-            // two-char tokens
-            "!" if self.peek_match("=")? => token!(TokenType::BangEqual),
-            "!" => token!(TokenType::Bang),
-
-            "=" if self.peek_match("=")? => token!(TokenType::EqualEqual),
-            "=" => token!(TokenType::Equal),
-
-            "<" if self.peek_match("=")? => token!(TokenType::LessEqual),
-            "<" => token!(TokenType::Less),
-
-            ">" if self.peek_match("=")? => token!(TokenType::GreaterEqual),
-            ">" => token!(TokenType::Greater),
-
-            "/" if self.peek_match("/")? => {
-                while self.peek()? != Some("\n") {
-                    self.advance()?;
-                }
-                Ok(None)
+            macro_rules! token {
+                ($type:expr) => {
+                    return Ok(self.build_token($type, loc));
+                };
             }
-            "/" => token!(TokenType::Slash),
 
-            "\n" => Ok(None),
+            let grapheme = match self.advance()? {
+                Some(g) => g,
+                None => token!(TokenType::Eof),
+            };
 
-            "\"" => return Ok(self.string(loc)?),
-            g if Self::is_digit(g) => Ok(self.number(loc)?),
-            g if Self::is_alpha(g) => Ok(Some(self.identifier(loc)?)),
-            " " | "\r" | "\t" => Ok(None),
-            g => {
-                self.invalid_grapheme(g, loc);
-                Ok(None)
+            match &grapheme[..] {
+                "(" => token!(TokenType::LeftParen),
+                ")" => token!(TokenType::RightParen),
+                "{" => token!(TokenType::LeftBrace),
+                "}" => token!(TokenType::RightBrace),
+                "," => token!(TokenType::Comma),
+                "." => token!(TokenType::Dot),
+                "-" => token!(TokenType::Minus),
+                "+" => token!(TokenType::Plus),
+                ";" => token!(TokenType::Semicolon),
+                "*" => token!(TokenType::Star),
+
+                // two-char tokens
+                "!" if self.peek_match("=")? => token!(TokenType::BangEqual),
+                "!" => token!(TokenType::Bang),
+
+                "=" if self.peek_match("=")? => token!(TokenType::EqualEqual),
+                "=" => token!(TokenType::Equal),
+
+                "<" if self.peek_match("=")? => token!(TokenType::LessEqual),
+                "<" => token!(TokenType::Less),
+
+                ">" if self.peek_match("=")? => token!(TokenType::GreaterEqual),
+                ">" => token!(TokenType::Greater),
+
+                "/" if self.peek_match("/")? => while self.peek_match("\n")? {},
+                "/" => token!(TokenType::Slash),
+
+                "\n" => {}
+                " " | "\r" | "\t" => {}
+
+                "\"" => return self.string(loc),
+                g if Self::is_digit(g) => return self.number(loc),
+                g if Self::is_alpha(g) => return self.identifier(loc),
+                _ => return Err(LexicalError::InvalidLexeme(grapheme, loc)),
             }
         }
     }
 
-    fn identifier(&mut self, start_loc: Location) -> Result<Token, io::Error> {
+    fn identifier(&mut self, start_loc: Location) -> ScanResult {
         while let Some(c) = self.peek()? {
             if Self::is_alpha_numeric(c) {
                 self.advance()?;
@@ -143,7 +128,7 @@ impl<T: Read + Seek> Scanner<T> {
         }
     }
 
-    fn number(&mut self, start_loc: Location) -> Result<Option<Token>, io::Error> {
+    fn number(&mut self, start_loc: Location) -> ScanResult {
         while let Some(c) = self.peek()? {
             if Self::is_digit(c) {
                 self.advance()?;
@@ -163,21 +148,13 @@ impl<T: Read + Seek> Scanner<T> {
             }
         }
 
-        match self.cur.parse::<f64>() {
-            Ok(literal) => Ok(Some(
-                self.build_token(TokenType::Number(literal), start_loc),
-            )),
-            Err(_) => {
-                self.error(LexicalError::InvalidNumberLiteral(
-                    self.cur.clone(),
-                    start_loc,
-                ));
-                Ok(None)
-            }
-        }
+        self.cur
+            .parse::<f64>()
+            .map(|l| self.build_token(TokenType::Number(l), start_loc))
+            .map_err(|_| LexicalError::InvalidNumberLiteral(self.cur.clone(), start_loc))
     }
 
-    fn string(&mut self, start_loc: Location) -> Result<Option<Token>, io::Error> {
+    fn string(&mut self, start_loc: Location) -> ScanResult {
         let mut literal = String::new();
 
         while let Some(c) = self.peek()? {
@@ -191,19 +168,16 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if self.peek()? != Some("\"") {
-            self.error(LexicalError::UnterminatedString(start_loc));
-            return Ok(None);
+            return Err(LexicalError::UnterminatedString(start_loc));
         }
 
         self.advance()?;
 
-        Ok(Some(
-            self.build_token(TokenType::String(literal), start_loc),
-        ))
+        Ok(self.build_token(TokenType::String(literal), start_loc))
     }
 
     fn advance(&mut self) -> Result<Option<String>, io::Error> {
-        let res = match self.buf.take() {
+        let res = match self.buf.pop_front() {
             None => match self.next()? {
                 Some(g) => {
                     self.cur.push_str(&g);
@@ -230,11 +204,21 @@ impl<T: Read + Seek> Scanner<T> {
     }
 
     fn peek(&mut self) -> Result<Option<&str>, io::Error> {
-        if self.buf.is_none() {
-            self.buf = self.next()?;
+        self.peek_many(1)
+    }
+
+    fn peek_many(&mut self, qty: usize) -> Result<Option<&str>, io::Error> {
+        assert_ne!(0, qty);
+
+        while self.buf.len() < qty {
+            if let Some(next) = self.next()? {
+                self.buf.push_back(next);
+            } else {
+                return Ok(None);
+            }
         }
 
-        Ok(self.buf.as_deref())
+        Ok(self.buf.get(qty - 1).map(|s| &s[..]))
     }
 
     fn peek_match(&mut self, expected: &str) -> Result<bool, io::Error> {
