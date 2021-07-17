@@ -37,14 +37,8 @@ impl<T: Read + Seek> Scanner<T> {
 
         loop {
             match self.next_token() {
-                Ok(token) => {
-                    if *token.r#type() == TokenType::Eof {
-                        tokens.push(token);
-                        break;
-                    }
-
-                    tokens.push(token);
-                }
+                Ok(None) => break,
+                Ok(Some(token)) => tokens.push(token),
                 Err(LexicalError::IO(err)) => return Err(RoxError::IO(err)),
                 Err(err) => errors.push(err),
             };
@@ -64,13 +58,13 @@ impl<T: Read + Seek> Scanner<T> {
 
             macro_rules! token {
                 ($type:expr) => {
-                    return Ok(self.build_token($type, loc));
+                    return Ok(Some(self.build_token($type, loc)));
                 };
             }
 
             let grapheme = match self.advance()? {
                 Some(g) => g,
-                None => token!(TokenType::Eof),
+                None => return Ok(None),
             };
 
             match &grapheme[..] {
@@ -122,9 +116,12 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if let Some(reserved) = reserved_token(&self.cur) {
-            Ok(self.build_token(reserved, start_loc))
+            Ok(Some(self.build_token(reserved, start_loc)))
         } else {
-            Ok(self.build_token(TokenType::Identifier(self.cur.clone()), start_loc))
+            Ok(Some(self.build_token(
+                TokenType::Identifier(self.cur.clone()),
+                start_loc,
+            )))
         }
     }
 
@@ -150,7 +147,7 @@ impl<T: Read + Seek> Scanner<T> {
 
         self.cur
             .parse::<f64>()
-            .map(|l| self.build_token(TokenType::Number(l), start_loc))
+            .map(|l| Some(self.build_token(TokenType::Number(l), start_loc)))
             .map_err(|_| LexicalError::InvalidNumberLiteral(self.cur.clone(), start_loc))
     }
 
@@ -173,7 +170,9 @@ impl<T: Read + Seek> Scanner<T> {
 
         self.advance()?;
 
-        Ok(self.build_token(TokenType::String(literal), start_loc))
+        Ok(Some(
+            self.build_token(TokenType::String(literal), start_loc),
+        ))
     }
 
     fn advance(&mut self) -> Result<Option<String>, io::Error> {
@@ -246,5 +245,21 @@ impl<T: Read + Seek> Scanner<T> {
 
     fn next(&mut self) -> Result<Option<String>, io::Error> {
         self.inp.next().transpose()
+    }
+}
+pub struct TokenIter<T: Read + Seek> {
+    scanner: Scanner<T>,
+}
+
+impl<T: Read + Seek> Scanner<T> {
+    pub fn into_iter(self) -> TokenIter<T> {
+        TokenIter { scanner: self }
+    }
+}
+
+impl<T: Read + Seek> Iterator for TokenIter<T> {
+    type Item = Result<Token, LexicalError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.scanner.next_token().transpose()
     }
 }

@@ -47,7 +47,6 @@ mod test {
             token!(TokenType::Semicolon, ";", (0, 7)),
             token!(TokenType::Plus, "+", (0, 8)),
             token!(TokenType::Star, "*", (0, 9)),
-            token!(TokenType::Eof, "", (0, 10)),
         ]
     );
 
@@ -69,21 +68,17 @@ mod test {
             token!(TokenType::Semicolon, ";", (0, 11)),
             token!(TokenType::Plus, "+", (0, 12)),
             token!(TokenType::Star, "*", (0, 13)),
-            token!(TokenType::Eof, "", (0, 14)),
         ]
     );
 
     test!(
         strings,
         "\"singleword\"",
-        vec![
-            token!(
-                TokenType::String("singleword".into()),
-                "\"singleword\"",
-                (0, 0)
-            ),
-            token!(TokenType::Eof, "", (0, 12)),
-        ]
+        vec![token!(
+            TokenType::String("singleword".into()),
+            "\"singleword\"",
+            (0, 0)
+        ),]
     );
 
     test!(
@@ -100,7 +95,6 @@ mod test {
             ),
             token!(TokenType::LeftBrace, "{", (1, 0)),
             token!(TokenType::RightBrace, "}", (1, 1)),
-            token!(TokenType::Eof, "", (1, 2)),
         ]
     );
 
@@ -138,7 +132,6 @@ mod test {
             token!(TokenType::LeftParen, "(", (2, 33)),
             token!(TokenType::RightParen, ")", (2, 34)),
             token!(TokenType::Semicolon, ";", (2, 35)),
-            token!(TokenType::Eof, "", (2, 36)),
         ]
     );
 }

@@ -47,8 +47,6 @@ pub enum TokenType {
     True,
     Var,
     While,
-
-    Eof,
 }
 
 #[derive(Clone, Debug, PartialEq)]
