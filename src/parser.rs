@@ -1,13 +1,12 @@
 use std::{
     collections::VecDeque,
-    io::{self, Read, Seek},
+    io::{Read, Seek},
 };
 
 use crate::{
     ast::Expr,
     lexer::{
         lexical_error::LexicalError,
-        location::Location,
         scanner::TokenIter,
         token::{Token, TokenType},
     },
