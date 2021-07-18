@@ -17,9 +17,7 @@ mod test {
             fn $name() {
                 let cursor = Cursor::new($input);
 
-                let tokens = Scanner::from(cursor)
-                    .and_then(Scanner::scan_tokens)
-                    .unwrap();
+                let tokens = Scanner::from(cursor).scan_tokens().unwrap();
 
                 for (idx, t) in tokens.0.iter().enumerate() {
                     let ot = &$output[idx];

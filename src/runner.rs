@@ -9,7 +9,7 @@ pub fn eval_file(path: &str) {
 }
 
 pub fn eval(expr: &str) -> String {
-    let scanner = Scanner::from(Cursor::new(expr)).unwrap();
+    let scanner = Scanner::from(Cursor::new(expr));
 
     let tokens = scanner.scan_tokens();
 

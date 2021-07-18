@@ -4,7 +4,7 @@ use super::{
     location::Location,
     token::{Token, TokenKind},
 };
-use crate::{error::RoxError, lexer::scan_result::ScanResult};
+use crate::lexer::scan_result::{ScanResult, ScanningError};
 use std::{
     collections::VecDeque,
     io::{self, BufReader, Bytes, Read, Seek},
@@ -19,19 +19,19 @@ pub struct Scanner<T: Read + Seek> {
 }
 
 impl<T: Read + Seek> Scanner<T> {
-    pub fn from(source: T) -> Result<Self, RoxError> {
+    pub fn from(source: T) -> Self {
         let reader = BufReader::new(source);
         let graphemes = Graphemes::from(reader);
 
-        Ok(Self {
+        Self {
             inp: graphemes,
             loc: Location::default(),
             buf: VecDeque::new(),
             cur: String::new(),
-        })
+        }
     }
 
-    pub fn scan_tokens(mut self) -> Result<(Vec<Token>, Vec<LexicalError>), RoxError> {
+    pub fn scan_tokens(mut self) -> Result<(Vec<Token>, Vec<LexicalError>), io::Error> {
         let mut tokens = vec![];
         let mut errors = vec![];
 
@@ -39,8 +39,8 @@ impl<T: Read + Seek> Scanner<T> {
             match self.next_token() {
                 Ok(None) => break,
                 Ok(Some(token)) => tokens.push(token),
-                Err(LexicalError::IO(err)) => return Err(RoxError::IO(err)),
-                Err(err) => errors.push(err),
+                Err(ScanningError::IO(err)) => return Err(err),
+                Err(ScanningError::LexicalError(err)) => errors.push(err),
             };
         }
 
@@ -101,7 +101,7 @@ impl<T: Read + Seek> Scanner<T> {
                 "\"" => return self.string(loc),
                 g if Self::is_digit(g) => return self.number(loc),
                 g if Self::is_alpha(g) => return self.identifier(loc),
-                _ => return Err(LexicalError::InvalidLexeme(grapheme, loc)),
+                _ => return Err(LexicalError::InvalidLexeme(grapheme, loc).into()),
             }
         }
     }
@@ -148,7 +148,7 @@ impl<T: Read + Seek> Scanner<T> {
         self.cur
             .parse::<f64>()
             .map(|l| Some(self.build_token(TokenKind::Number(l), start_loc)))
-            .map_err(|_| LexicalError::InvalidNumberLiteral(self.cur.clone(), start_loc))
+            .map_err(|_| LexicalError::InvalidNumberLiteral(self.cur.clone(), start_loc).into())
     }
 
     fn string(&mut self, start_loc: Location) -> ScanResult {
@@ -165,7 +165,7 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if self.peek()? != Some("\"") {
-            return Err(LexicalError::UnterminatedString(start_loc));
+            return Err(LexicalError::UnterminatedString(start_loc).into());
         }
 
         self.advance()?;
@@ -258,7 +258,7 @@ impl<T: Read + Seek> Scanner<T> {
 }
 
 impl<T: Read + Seek> Iterator for TokenIter<T> {
-    type Item = Result<Token, LexicalError>;
+    type Item = Result<Token, ScanningError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.scanner.next_token().transpose()
     }
