@@ -1,15 +1,14 @@
-use std::{
-    collections::VecDeque,
-    io::{Read, Seek},
-};
-
 use crate::{
     ast::Expr,
     lexer::{
         lexical_error::LexicalError,
         scanner::TokenIter,
-        token::{Token, TokenType},
+        token::{Token, TokenKind},
     },
+};
+use std::{
+    collections::VecDeque,
+    io::{Read, Seek},
 };
 
 pub struct Parser<T: Read + Seek> {
@@ -25,7 +24,7 @@ impl<T: Read + Seek> Parser<T> {
     pub fn equality(&mut self) -> Result<Box<Expr>, LexicalError> {
         let expr = self.comparison()?;
 
-        while let Some(operator) = self.r#match(&[TokenType::BangEqual, TokenType::EqualEqual])? {
+        while let Some(operator) = self.r#match(&[TokenKind::BangEqual, TokenKind::EqualEqual])? {
             let right = self.term()?;
 
             return Ok(Box::new(Expr::Binary(expr, operator, right)));
@@ -38,10 +37,10 @@ impl<T: Read + Seek> Parser<T> {
         let expr = self.term()?;
 
         while let Some(operator) = self.r#match(&[
-            TokenType::Greater,
-            TokenType::GreaterEqual,
-            TokenType::Less,
-            TokenType::LessEqual,
+            TokenKind::Greater,
+            TokenKind::GreaterEqual,
+            TokenKind::Less,
+            TokenKind::LessEqual,
         ])? {
             let right = self.term()?;
 
@@ -54,7 +53,7 @@ impl<T: Read + Seek> Parser<T> {
     fn term(&mut self) -> Result<Box<Expr>, LexicalError> {
         let expr = self.factor()?;
 
-        while let Some(operator) = self.r#match(&[TokenType::Minus, TokenType::Plus])? {
+        while let Some(operator) = self.r#match(&[TokenKind::Minus, TokenKind::Plus])? {
             let right = self.factor()?;
 
             return Ok(Box::new(Expr::Binary(expr, operator, right)));
@@ -66,7 +65,7 @@ impl<T: Read + Seek> Parser<T> {
     fn factor(&mut self) -> Result<Box<Expr>, LexicalError> {
         let expr = self.unary()?;
 
-        while let Some(operator) = self.r#match(&[TokenType::Slash, TokenType::Star])? {
+        while let Some(operator) = self.r#match(&[TokenKind::Slash, TokenKind::Star])? {
             let right = self.unary()?;
 
             return Ok(Box::new(Expr::Binary(expr, operator, right)));
@@ -76,7 +75,7 @@ impl<T: Read + Seek> Parser<T> {
     }
 
     fn unary(&mut self) -> Result<Box<Expr>, LexicalError> {
-        if let Some(operator) = self.r#match(&[TokenType::Bang, TokenType::Minus])? {
+        if let Some(operator) = self.r#match(&[TokenKind::Bang, TokenKind::Minus])? {
             let right = self.unary()?;
 
             return Ok(Box::new(Expr::Unary(operator, right)));
@@ -87,15 +86,15 @@ impl<T: Read + Seek> Parser<T> {
 
     fn primary(&mut self) -> Result<Box<Expr>, LexicalError> {
         if let Some(token) = self.peek()?.cloned() {
-            match token.r#type() {
-                TokenType::False => Ok(Box::new(Expr::Literal(token))),
-                TokenType::True => Ok(Box::new(Expr::Literal(token))),
-                TokenType::Nil => Ok(Box::new(Expr::Literal(token))),
-                TokenType::Number(_) => Ok(Box::new(Expr::Literal(token))),
-                TokenType::String(_) => Ok(Box::new(Expr::Literal(token))),
-                TokenType::LeftParen => {
+            match token.kind() {
+                TokenKind::False => Ok(Box::new(Expr::Literal(token))),
+                TokenKind::True => Ok(Box::new(Expr::Literal(token))),
+                TokenKind::Nil => Ok(Box::new(Expr::Literal(token))),
+                TokenKind::Number(_) => Ok(Box::new(Expr::Literal(token))),
+                TokenKind::String(_) => Ok(Box::new(Expr::Literal(token))),
+                TokenKind::LeftParen => {
                     let expr = self.expression()?;
-                    self.consume(&TokenType::RightParen, "Expect ')' after expression.")?;
+                    self.consume(&TokenKind::RightParen, "Expect ')' after expression.")?;
 
                     Ok(Box::new(Expr::Grouping(expr)))
                 }
@@ -106,7 +105,7 @@ impl<T: Read + Seek> Parser<T> {
         }
     }
 
-    fn consume(&mut self, kind: &TokenType, msg: &str) -> Result<Option<Token>, LexicalError> {
+    fn consume(&mut self, kind: &TokenKind, msg: &str) -> Result<Option<Token>, LexicalError> {
         if self.check(&kind)? {
             self.advance()
         } else {
@@ -114,8 +113,8 @@ impl<T: Read + Seek> Parser<T> {
         }
     }
 
-    fn r#match(&mut self, types: &[TokenType]) -> Result<Option<Token>, LexicalError> {
-        for kind in types {
+    fn r#match(&mut self, kinds: &[TokenKind]) -> Result<Option<Token>, LexicalError> {
+        for kind in kinds {
             if self.check(kind)? {
                 return self.advance();
             }
@@ -124,10 +123,10 @@ impl<T: Read + Seek> Parser<T> {
         Ok(None)
     }
 
-    fn check(&mut self, kind: &TokenType) -> Result<bool, LexicalError> {
+    fn check(&mut self, kind: &TokenKind) -> Result<bool, LexicalError> {
         Ok(self
             .peek()?
-            .map(|t| t.r#type())
+            .map(|t| t.kind())
             .filter(|k| *k == kind)
             .is_some())
     }

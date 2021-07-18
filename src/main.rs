@@ -1,9 +1,4 @@
-use ast::Expr;
 use clap::Clap;
-use lexer::{
-    location::Location,
-    token::{Token, TokenType},
-};
 use opts::Opts;
 
 mod ast;

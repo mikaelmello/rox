@@ -1,23 +1,23 @@
-use super::token::TokenType;
+use super::token::TokenKind;
 
-pub fn reserved_token(lexeme: &str) -> Option<TokenType> {
+pub fn reserved_token(lexeme: &str) -> Option<TokenKind> {
     match lexeme {
-        "and" => Some(TokenType::And),
-        "class" => Some(TokenType::Class),
-        "else" => Some(TokenType::Else),
-        "false" => Some(TokenType::False),
-        "for" => Some(TokenType::For),
-        "fun" => Some(TokenType::Fun),
-        "if" => Some(TokenType::If),
-        "nil" => Some(TokenType::Nil),
-        "or" => Some(TokenType::Or),
-        "print" => Some(TokenType::Print),
-        "return" => Some(TokenType::Return),
-        "super" => Some(TokenType::Super),
-        "this" => Some(TokenType::This),
-        "true" => Some(TokenType::True),
-        "var" => Some(TokenType::Var),
-        "while" => Some(TokenType::While),
+        "and" => Some(TokenKind::And),
+        "class" => Some(TokenKind::Class),
+        "else" => Some(TokenKind::Else),
+        "false" => Some(TokenKind::False),
+        "for" => Some(TokenKind::For),
+        "fun" => Some(TokenKind::Fun),
+        "if" => Some(TokenKind::If),
+        "nil" => Some(TokenKind::Nil),
+        "or" => Some(TokenKind::Or),
+        "print" => Some(TokenKind::Print),
+        "return" => Some(TokenKind::Return),
+        "super" => Some(TokenKind::Super),
+        "this" => Some(TokenKind::This),
+        "true" => Some(TokenKind::True),
+        "var" => Some(TokenKind::Var),
+        "while" => Some(TokenKind::While),
         _ => None,
     }
 }

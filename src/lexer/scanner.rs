@@ -2,7 +2,7 @@ use super::{
     config::reserved_token,
     lexical_error::LexicalError,
     location::Location,
-    token::{Token, TokenType},
+    token::{Token, TokenKind},
 };
 use crate::{error::RoxError, lexer::scan_result::ScanResult};
 use std::{
@@ -47,8 +47,8 @@ impl<T: Read + Seek> Scanner<T> {
         Ok((tokens, errors))
     }
 
-    fn build_token(&self, r#type: TokenType, loc: Location) -> Token {
-        Token::new(r#type, &self.cur, loc)
+    fn build_token(&self, kind: TokenKind, loc: Location) -> Token {
+        Token::new(kind, &self.cur, loc)
     }
 
     fn next_token(&mut self) -> ScanResult {
@@ -57,8 +57,8 @@ impl<T: Read + Seek> Scanner<T> {
             let loc = self.loc;
 
             macro_rules! token {
-                ($type:expr) => {
-                    return Ok(Some(self.build_token($type, loc)));
+                ($kind:expr) => {
+                    return Ok(Some(self.build_token($kind, loc)));
                 };
             }
 
@@ -68,32 +68,32 @@ impl<T: Read + Seek> Scanner<T> {
             };
 
             match &grapheme[..] {
-                "(" => token!(TokenType::LeftParen),
-                ")" => token!(TokenType::RightParen),
-                "{" => token!(TokenType::LeftBrace),
-                "}" => token!(TokenType::RightBrace),
-                "," => token!(TokenType::Comma),
-                "." => token!(TokenType::Dot),
-                "-" => token!(TokenType::Minus),
-                "+" => token!(TokenType::Plus),
-                ";" => token!(TokenType::Semicolon),
-                "*" => token!(TokenType::Star),
+                "(" => token!(TokenKind::LeftParen),
+                ")" => token!(TokenKind::RightParen),
+                "{" => token!(TokenKind::LeftBrace),
+                "}" => token!(TokenKind::RightBrace),
+                "," => token!(TokenKind::Comma),
+                "." => token!(TokenKind::Dot),
+                "-" => token!(TokenKind::Minus),
+                "+" => token!(TokenKind::Plus),
+                ";" => token!(TokenKind::Semicolon),
+                "*" => token!(TokenKind::Star),
 
                 // two-char tokens
-                "!" if self.peek_match("=")? => token!(TokenType::BangEqual),
-                "!" => token!(TokenType::Bang),
+                "!" if self.peek_match("=")? => token!(TokenKind::BangEqual),
+                "!" => token!(TokenKind::Bang),
 
-                "=" if self.peek_match("=")? => token!(TokenType::EqualEqual),
-                "=" => token!(TokenType::Equal),
+                "=" if self.peek_match("=")? => token!(TokenKind::EqualEqual),
+                "=" => token!(TokenKind::Equal),
 
-                "<" if self.peek_match("=")? => token!(TokenType::LessEqual),
-                "<" => token!(TokenType::Less),
+                "<" if self.peek_match("=")? => token!(TokenKind::LessEqual),
+                "<" => token!(TokenKind::Less),
 
-                ">" if self.peek_match("=")? => token!(TokenType::GreaterEqual),
-                ">" => token!(TokenType::Greater),
+                ">" if self.peek_match("=")? => token!(TokenKind::GreaterEqual),
+                ">" => token!(TokenKind::Greater),
 
                 "/" if self.peek_match("/")? => while self.peek_match("\n")? {},
-                "/" => token!(TokenType::Slash),
+                "/" => token!(TokenKind::Slash),
 
                 "\n" => {}
                 " " | "\r" | "\t" => {}
@@ -119,7 +119,7 @@ impl<T: Read + Seek> Scanner<T> {
             Ok(Some(self.build_token(reserved, start_loc)))
         } else {
             Ok(Some(self.build_token(
-                TokenType::Identifier(self.cur.clone()),
+                TokenKind::Identifier(self.cur.clone()),
                 start_loc,
             )))
         }
@@ -147,7 +147,7 @@ impl<T: Read + Seek> Scanner<T> {
 
         self.cur
             .parse::<f64>()
-            .map(|l| Some(self.build_token(TokenType::Number(l), start_loc)))
+            .map(|l| Some(self.build_token(TokenKind::Number(l), start_loc)))
             .map_err(|_| LexicalError::InvalidNumberLiteral(self.cur.clone(), start_loc))
     }
 
@@ -171,7 +171,7 @@ impl<T: Read + Seek> Scanner<T> {
         self.advance()?;
 
         Ok(Some(
-            self.build_token(TokenType::String(literal), start_loc),
+            self.build_token(TokenKind::String(literal), start_loc),
         ))
     }
 

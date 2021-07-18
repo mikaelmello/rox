@@ -1,7 +1,7 @@
 use super::location::Location;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TokenType {
+pub enum TokenKind {
     // Single-character tokens.
     LeftParen,
     RightParen,
@@ -51,21 +51,21 @@ pub enum TokenType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
-    r#type: TokenType,
+    kind: TokenKind,
     lexeme: String,
     loc: Location,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, lexeme: &str, loc: Location) -> Self {
+    pub fn new(kind: TokenKind, lexeme: &str, loc: Location) -> Self {
         Self {
-            r#type,
+            kind,
             lexeme: String::from(lexeme),
             loc,
         }
     }
 
-    pub fn r#type(&self) -> &TokenType {
-        &self.r#type
+    pub fn kind(&self) -> &TokenKind {
+        &self.kind
     }
 }
