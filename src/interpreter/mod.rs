@@ -30,6 +30,12 @@ impl Expr {
                         (Literal::String(l, loc), Literal::String(r, _)) => {
                             Ok(Literal::String(l + &r, loc))
                         }
+                        (Literal::String(l, loc), rhs) => {
+                            Ok(Literal::String(l + &rhs.to_string(), loc))
+                        }
+                        (lhs, Literal::String(r, loc)) => {
+                            Ok(Literal::String(lhs.to_string() + &r, loc))
+                        }
                         (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Minus => match (left, right) {
