@@ -1,28 +1,47 @@
-use std::io::{self, BufRead, Write};
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
+use std::io::{self, Write};
 
 use crate::runner;
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub fn repl() -> io::Result<()> {
-    let mut buffer = String::new();
-    let stdin = io::stdin();
     let mut stdout = io::stdout();
 
+    // `()` can be used when no completer is required
+    let mut rl = Editor::<()>::new();
+
+    writeln!(stdout, "rox {}", VERSION)?;
+
     loop {
-        buffer.clear();
+        let readline = rl.readline(">>> ");
+        match readline {
+            Ok(line) => {
+                if line.is_empty() {
+                    continue;
+                }
 
-        write!(stdout, "> ")?;
-        stdout.flush()?;
+                rl.add_history_entry(line.as_str());
 
-        let read = stdin.lock().read_line(&mut buffer)?;
+                let result = runner::eval(&line);
 
-        if read == 0 {
-            write!(stdout, "\n")?;
-            break;
+                write!(stdout, "{}\n", result)?;
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
         }
-
-        let result = runner::eval(&buffer);
-
-        write!(stdout, "{}\n", result)?;
     }
+
     Ok(())
 }
