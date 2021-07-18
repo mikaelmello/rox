@@ -1,8 +1,11 @@
-use crate::lexer::{
-    location::Location,
-    scan_result::ScanningError,
-    scanner::TokenIter,
-    token::{Token, TokenKind},
+use crate::{
+    lexer::{
+        location::Location,
+        scan_result::ScanningError,
+        scanner::TokenIter,
+        token::{Token, TokenKind},
+    },
+    parser::ast::Literal,
 };
 use std::{
     collections::VecDeque,
@@ -161,11 +164,11 @@ impl<T: Read + Seek> Parser<T> {
         if let Some(token) = self.peek()?.cloned() {
             println!("{:?} what is happening", token);
             match token.kind() {
-                TokenKind::False => literal!(token),
-                TokenKind::True => literal!(token),
-                TokenKind::Nil => literal!(token),
-                TokenKind::Number(_) => literal!(token),
-                TokenKind::String(_) => literal!(token),
+                TokenKind::False => literal!(Literal::Bool(false)),
+                TokenKind::True => literal!(Literal::Bool(true)),
+                TokenKind::Nil => literal!(Literal::Nil),
+                TokenKind::Number(n) => literal!(Literal::Number(*n)),
+                TokenKind::String(s) => literal!(Literal::String(s.clone())),
                 TokenKind::LeftParen => self.grouping(token),
                 _ => Err(SyntaxError::UnexpectedExpression(
                     token.location(),

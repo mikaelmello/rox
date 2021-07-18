@@ -5,8 +5,16 @@ use crate::lexer::token::Token;
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
-    Literal(Token),
+    Literal(Literal),
     Unary(Token, Box<Expr>),
+}
+
+#[derive(Debug)]
+pub enum Literal {
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Nil,
 }
 
 impl Debug for Expr {
