@@ -17,7 +17,7 @@ use self::{
     parse_error::{ParseError, SyntaxError},
 };
 
-mod ast;
+pub mod ast;
 mod parse_error;
 
 pub struct Parser<T: Read + Seek> {
@@ -71,7 +71,7 @@ impl<T: Read + Seek> Parser<T> {
                     self.advance()?;
                     let right = self.comparison()?;
 
-                    expr = Box::new(Expr::Binary(expr, operator, right));
+                    expr = Box::new(Expr::Binary(expr, operator.into(), right));
                 }
                 _ => break,
             }
@@ -92,7 +92,7 @@ impl<T: Read + Seek> Parser<T> {
                     self.advance()?;
                     let right = self.term()?;
 
-                    expr = Box::new(Expr::Binary(expr, operator, right));
+                    expr = Box::new(Expr::Binary(expr, operator.into(), right));
                 }
                 _ => break,
             }
@@ -110,7 +110,7 @@ impl<T: Read + Seek> Parser<T> {
                     self.advance()?;
                     let right = self.factor()?;
 
-                    expr = Box::new(Expr::Binary(expr, operator, right));
+                    expr = Box::new(Expr::Binary(expr, operator.into(), right));
                 }
                 _ => break,
             }
@@ -128,7 +128,7 @@ impl<T: Read + Seek> Parser<T> {
                     self.advance()?;
                     let right = self.unary()?;
 
-                    expr = Box::new(Expr::Binary(expr, operator, right));
+                    expr = Box::new(Expr::Binary(expr, operator.into(), right));
                 }
                 _ => break,
             }
@@ -144,7 +144,7 @@ impl<T: Read + Seek> Parser<T> {
                     self.advance()?;
                     let right = self.unary()?;
 
-                    return Ok(Box::new(Expr::Unary(operator, right)));
+                    return Ok(Box::new(Expr::Unary(operator.into(), right)));
                 }
                 _ => {}
             }
@@ -162,7 +162,6 @@ impl<T: Read + Seek> Parser<T> {
         }
 
         if let Some(token) = self.peek()?.cloned() {
-            println!("{:?} what is happening", token);
             match token.kind() {
                 TokenKind::False => literal!(Literal::Bool(false)),
                 TokenKind::True => literal!(Literal::Bool(true)),
