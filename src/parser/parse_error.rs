@@ -8,13 +8,13 @@ pub enum SyntaxError {
     #[error("{0}")]
     LexicalError(#[from] LexicalError),
 
-    #[error("Missing closing parenthesis at {0}")]
+    #[error("Missing closing parenthesis")]
     MissingClosingParenthesis(Location),
 
-    #[error("Unexpected expression \"{1}\" at {0}")]
+    #[error("Unexpected expression \"{1}\"")]
     UnexpectedExpression(Location, String),
 
-    #[error("Missing expression at {0}")]
+    #[error("Missing expression")]
     MissingExpression(Location),
 }
 

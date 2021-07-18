@@ -20,6 +20,23 @@ pub enum BinOp {
     LessEqual,
 }
 
+impl BinOp {
+    pub fn symbol(&self) -> String {
+        match self {
+            BinOp::Minus => String::from("-"),
+            BinOp::Plus => String::from("+"),
+            BinOp::Slash => String::from("/"),
+            BinOp::Star => String::from("*"),
+            BinOp::BangEqual => String::from("!="),
+            BinOp::EqualEqual => String::from("=="),
+            BinOp::Greater => String::from(">"),
+            BinOp::GreaterEqual => String::from(">="),
+            BinOp::Less => String::from("<"),
+            BinOp::LessEqual => String::from("<="),
+        }
+    }
+}
+
 impl From<Token> for BinOp {
     fn from(t: Token) -> Self {
         match t.kind() {
@@ -63,6 +80,15 @@ pub enum Literal {
 }
 
 impl Literal {
+    pub fn symbol(&self) -> String {
+        match self {
+            Literal::Bool(_, _) => String::from("bool"),
+            Literal::Number(_, _) => String::from("number"),
+            Literal::String(_, _) => String::from("string"),
+            Literal::Nil(_) => String::from("nil"),
+        }
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Literal::Bool(b, _) => *b,

@@ -3,12 +3,12 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum LexicalError {
-    #[error("Invalid lexeme {1}: {0}")]
+    #[error("Invalid lexeme \"{0}\"")]
     InvalidLexeme(String, Location),
 
-    #[error("Invalid number literal {1}: {0}")]
+    #[error("Invalid number literal {0}")]
     InvalidNumberLiteral(String, Location),
 
-    #[error("String at {0} is not terminated")]
+    #[error("String literal is not terminated")]
     UnterminatedString(Location),
 }

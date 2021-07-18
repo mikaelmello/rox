@@ -11,6 +11,17 @@ impl Expr {
                 let left = left.evaluate()?;
                 let right = right.evaluate()?;
 
+                macro_rules! not_supported {
+                    ($op:expr,$lhs:expr,$rhs:expr) => {{
+                        Err(RuntimeError::OperationNotSupported(
+                            $op.symbol(),
+                            $lhs.symbol(),
+                            $rhs.symbol(),
+                            $lhs.location(),
+                        ))
+                    }};
+                }
+
                 match op {
                     BinOp::Plus => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
@@ -19,27 +30,25 @@ impl Expr {
                         (Literal::String(l, loc), Literal::String(r, _)) => {
                             Ok(Literal::String(l + &r, loc))
                         }
-                        (left, _) => {
-                            return Err(RuntimeError::NotNumberOrStringOperands(left.location()))
-                        }
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Minus => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Number(l - r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Star => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Number(l * r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Slash => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Number(l / r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::BangEqual => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
@@ -52,10 +61,7 @@ impl Expr {
                             Ok(Literal::Bool(l != r, loc))
                         }
                         (Literal::Nil(loc), Literal::Nil(_)) => Ok(Literal::Bool(false, loc)),
-
-                        (left, _) => {
-                            return Err(RuntimeError::DifferentTypeOperands(left.location()))
-                        }
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::EqualEqual => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
@@ -68,34 +74,31 @@ impl Expr {
                             Ok(Literal::Bool(l == r, loc))
                         }
                         (Literal::Nil(loc), Literal::Nil(_)) => Ok(Literal::Bool(true, loc)),
-
-                        (left, _) => {
-                            return Err(RuntimeError::DifferentTypeOperands(left.location()))
-                        }
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Greater => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Bool(l > r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::GreaterEqual => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Bool(l >= r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Less => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Bool(l < r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::LessEqual => match (left, right) {
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Bool(l <= r, loc))
                         }
-                        (left, _) => return Err(RuntimeError::NotNumberOperands(left.location())),
+                        (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                 }
             }

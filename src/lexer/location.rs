@@ -17,6 +17,10 @@ impl Location {
     pub fn next(&mut self) {
         self.1 = self.1.saturating_add(1);
     }
+
+    pub fn line(&self) -> isize {
+        self.0
+    }
 }
 
 impl Display for Location {
