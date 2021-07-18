@@ -51,6 +51,9 @@ impl Expr {
                         (lhs, rhs) => not_supported!(op, lhs, rhs),
                     },
                     BinOp::Slash => match (left, right) {
+                        (Literal::Number(_, _), Literal::Number(r, loc)) if r == 0f64 => {
+                            Err(RuntimeError::DvisionByZero(loc))
+                        }
                         (Literal::Number(l, loc), Literal::Number(r, _)) => {
                             Ok(Literal::Number(l / r, loc))
                         }
