@@ -68,4 +68,12 @@ impl Token {
     pub fn kind(&self) -> &TokenKind {
         &self.kind
     }
+
+    pub fn location(&self) -> Location {
+        self.loc
+    }
+
+    pub fn lexeme(&self) -> &str {
+        &self.lexeme
+    }
 }

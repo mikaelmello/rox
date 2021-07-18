@@ -17,11 +17,13 @@ mod test {
             fn $name() {
                 let cursor = Cursor::new($input);
 
-                let tokens = Scanner::from(cursor).scan_tokens().unwrap();
+                let mut tokens = Scanner::from(cursor).into_iter();
 
-                for (idx, t) in tokens.0.iter().enumerate() {
+                let mut idx = 0;
+                while let Some(t) = tokens.next().transpose().unwrap() {
                     let ot = &$output[idx];
-                    assert_eq!(ot, t);
+                    assert_eq!(*ot, t);
+                    idx = idx.saturating_add(1);
                 }
             }
         };

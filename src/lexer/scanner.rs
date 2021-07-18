@@ -31,22 +31,6 @@ impl<T: Read + Seek> Scanner<T> {
         }
     }
 
-    pub fn scan_tokens(mut self) -> Result<(Vec<Token>, Vec<LexicalError>), io::Error> {
-        let mut tokens = vec![];
-        let mut errors = vec![];
-
-        loop {
-            match self.next_token() {
-                Ok(None) => break,
-                Ok(Some(token)) => tokens.push(token),
-                Err(ScanningError::IO(err)) => return Err(err),
-                Err(ScanningError::LexicalError(err)) => errors.push(err),
-            };
-        }
-
-        Ok((tokens, errors))
-    }
-
     fn build_token(&self, kind: TokenKind, loc: Location) -> Token {
         Token::new(kind, &self.cur, loc)
     }
@@ -101,7 +85,7 @@ impl<T: Read + Seek> Scanner<T> {
                 "\"" => return self.string(loc),
                 g if Self::is_digit(g) => return self.number(loc),
                 g if Self::is_alpha(g) => return self.identifier(loc),
-                _ => return Err(LexicalError::InvalidLexeme(grapheme, loc).into()),
+                _ => Err(LexicalError::InvalidLexeme(grapheme, loc))?,
             }
         }
     }
@@ -165,7 +149,7 @@ impl<T: Read + Seek> Scanner<T> {
         }
 
         if self.peek()? != Some("\"") {
-            return Err(LexicalError::UnterminatedString(start_loc).into());
+            Err(LexicalError::UnterminatedString(start_loc))?
         }
 
         self.advance()?;

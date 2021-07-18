@@ -1,7 +1,6 @@
 use clap::Clap;
 use opts::Opts;
 
-mod ast;
 mod error;
 mod lexer;
 mod opts;

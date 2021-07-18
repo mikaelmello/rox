@@ -1,6 +1,6 @@
 use std::{fs, io::Cursor};
 
-use crate::lexer::scanner::Scanner;
+use crate::{lexer::scanner::Scanner, parser::Parser};
 
 pub fn eval_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Something went wrong reading the file");
@@ -10,11 +10,12 @@ pub fn eval_file(path: &str) {
 
 pub fn eval(expr: &str) -> String {
     let scanner = Scanner::from(Cursor::new(expr));
+    let mut parser = Parser::new(scanner.into_iter());
 
-    let tokens = scanner.scan_tokens();
+    let ast = parser.expression();
 
-    match tokens {
-        Ok((tokens, errors)) => format!("{:?}\n{:?}", tokens, errors),
+    match ast {
+        Ok(expr) => format!("{:?}", expr),
         Err(e) => format!("{}", e),
     }
 }
