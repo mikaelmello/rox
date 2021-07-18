@@ -1,7 +1,10 @@
 use core::panic;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-use crate::lexer::token::{Token, TokenKind};
+use crate::lexer::{
+    location::Location,
+    token::{Token, TokenKind},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub enum BinOp {
@@ -34,6 +37,7 @@ impl From<Token> for BinOp {
         }
     }
 }
+
 #[derive(Copy, Clone, Debug)]
 pub enum UnaryOp {
     Minus,
@@ -52,10 +56,41 @@ impl From<Token> for UnaryOp {
 
 #[derive(Debug)]
 pub enum Literal {
-    Bool(bool),
-    Number(f64),
-    String(String),
-    Nil,
+    Bool(bool, Location),
+    Number(f64, Location),
+    String(String, Location),
+    Nil(Location),
+}
+
+impl Literal {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Literal::Bool(b, _) => *b,
+            Literal::Number(_, _) => true,
+            Literal::String(_, _) => true,
+            Literal::Nil(_) => false,
+        }
+    }
+
+    pub fn location(&self) -> Location {
+        match self {
+            Literal::Bool(_, l) => *l,
+            Literal::Number(_, l) => *l,
+            Literal::String(_, l) => *l,
+            Literal::Nil(l) => *l,
+        }
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Bool(val, _) => write!(f, "{}", val),
+            Literal::Number(val, _) => write!(f, "{}", val),
+            Literal::String(val, _) => write!(f, "{}", val),
+            Literal::Nil(_) => write!(f, "nil"),
+        }
+    }
 }
 
 pub enum Expr {

@@ -163,11 +163,11 @@ impl<T: Read + Seek> Parser<T> {
 
         if let Some(token) = self.peek()?.cloned() {
             match token.kind() {
-                TokenKind::False => literal!(Literal::Bool(false)),
-                TokenKind::True => literal!(Literal::Bool(true)),
-                TokenKind::Nil => literal!(Literal::Nil),
-                TokenKind::Number(n) => literal!(Literal::Number(*n)),
-                TokenKind::String(s) => literal!(Literal::String(s.clone())),
+                TokenKind::False => literal!(Literal::Bool(false, token.location())),
+                TokenKind::True => literal!(Literal::Bool(true, token.location())),
+                TokenKind::Nil => literal!(Literal::Nil(token.location())),
+                TokenKind::Number(n) => literal!(Literal::Number(*n, token.location())),
+                TokenKind::String(s) => literal!(Literal::String(s.clone(), token.location())),
                 TokenKind::LeftParen => self.grouping(token),
                 _ => Err(SyntaxError::UnexpectedExpression(
                     token.location(),

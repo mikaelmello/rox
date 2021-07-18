@@ -2,6 +2,7 @@ use clap::Clap;
 use opts::Opts;
 
 mod error;
+mod interpreter;
 mod lexer;
 mod opts;
 mod parser;

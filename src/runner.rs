@@ -14,8 +14,14 @@ pub fn eval(expr: &str) -> String {
 
     let ast = parser.expression();
 
-    match ast {
-        Ok(expr) => format!("{:?}", expr),
-        Err(e) => format!("{}", e),
+    if let Ok(expr) = ast {
+        let result = expr.evaluate();
+
+        match result {
+            Ok(expr) => format!("{}", expr),
+            Err(e) => format!("{}", e),
+        }
+    } else {
+        format!("{}", ast.unwrap_err())
     }
 }
