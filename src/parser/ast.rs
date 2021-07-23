@@ -137,7 +137,7 @@ impl Display for Literal {
             Literal::Bool(val, _) => write!(f, "{}", val),
             Literal::Number(val, _) => write!(f, "{}", val),
             Literal::String(val, _) => write!(f, "{}", val),
-            Literal::Nil(_) => write!(f, "nil"),
+            Literal::Nil(_) => Ok(()),
         }
     }
 }

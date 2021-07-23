@@ -24,9 +24,13 @@ pub fn repl() -> io::Result<()> {
 
                 rl.add_history_entry(line.as_str());
 
-                let result = runner::eval(&line);
+                let results = runner::eval(&line);
 
-                write!(stdout, "{}\n", result)?;
+                for result in results {
+                    if !result.is_empty() {
+                        write!(stdout, "{}\n", result)?;
+                    }
+                }
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

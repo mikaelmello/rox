@@ -1,8 +1,6 @@
 use std::io;
 
-use crate::lexer::{
-    lexical_error::LexicalError, location::Location, scan_result::ScanningError, token::TokenKind,
-};
+use crate::lexer::{lexical_error::LexicalError, location::Location, scan_result::ScanningError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

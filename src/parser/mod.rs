@@ -14,7 +14,7 @@ use std::{
 
 use self::{
     ast::{Expr, Stmt},
-    parse_error::{ParseError, ParseResult, SyntaxError},
+    parse_error::{ParseResult, SyntaxError},
 };
 
 pub mod ast;

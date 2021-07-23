@@ -1,6 +1,6 @@
 use std::{fs, io::Cursor};
 
-use crate::{lexer::scanner::Scanner, parser::Parser};
+use crate::{interpreter::Interpret, lexer::scanner::Scanner, parser::Parser};
 
 pub fn eval_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Something went wrong reading the file");
@@ -8,20 +8,31 @@ pub fn eval_file(path: &str) {
     let _ = eval(&contents);
 }
 
-pub fn eval(expr: &str) -> String {
+pub fn eval(expr: &str) -> Vec<String> {
     let scanner = Scanner::from(Cursor::new(expr));
     let mut parser = Parser::new(scanner.into_iter());
 
-    let ast = parser.expression();
+    let ast = parser.parse();
 
-    if let Ok(expr) = ast {
-        let result = expr.evaluate();
+    match ast {
+        Ok(stmts) => {
+            let mut results = vec![];
+            for stmt in stmts {
+                let result = stmt.evaluate();
 
-        match result {
-            Ok(expr) => format!("{}", expr),
-            Err(e) => format!("{}", e),
+                match result {
+                    Ok(expr) => results.push(format!("{}", expr)),
+                    Err(e) => {
+                        results.push(format!("{}", e));
+                        break;
+                    }
+                }
+            }
+
+            results
         }
-    } else {
-        format!("{}", ast.unwrap_err())
+        Err(e) => {
+            vec![format!("{}", e)]
+        }
     }
 }

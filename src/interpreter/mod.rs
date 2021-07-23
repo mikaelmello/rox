@@ -1,11 +1,28 @@
-use crate::parser::ast::{BinOp, Expr, Literal, UnaryOp};
+use crate::parser::ast::{BinOp, Expr, Literal, Stmt, UnaryOp};
 
 use self::runtime_error::RuntimeError;
 
 mod runtime_error;
 
-impl Expr {
-    pub fn evaluate(self) -> Result<Literal, RuntimeError> {
+pub trait Interpret {
+    fn evaluate(self) -> Result<Literal, RuntimeError>;
+}
+
+impl Interpret for Stmt {
+    fn evaluate(self) -> Result<Literal, RuntimeError> {
+        match self {
+            Stmt::Expression(expr) => expr.evaluate(),
+            Stmt::Print(expr) => {
+                let result = expr.evaluate()?;
+                println!("{}", result);
+                Ok(Literal::Nil(result.location()))
+            }
+        }
+    }
+}
+
+impl Interpret for Expr {
+    fn evaluate(self) -> Result<Literal, RuntimeError> {
         match self {
             Expr::Binary(left, op, right) => {
                 let left = left.evaluate()?;
