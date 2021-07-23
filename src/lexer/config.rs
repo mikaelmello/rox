@@ -1,5 +1,6 @@
 use super::token::TokenKind;
 
+#[inline]
 pub fn reserved_token(lexeme: &str) -> Option<TokenKind> {
     match lexeme {
         "and" => Some(TokenKind::And),
