@@ -25,7 +25,7 @@ impl Location {
 
 impl Display for Location {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        if self.0 < 0 {
+        if *self == Location::EOF {
             write!(fmt, "EOF")
         } else {
             write!(fmt, "{}:{}", self.0, self.1)
