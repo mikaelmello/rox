@@ -13,8 +13,8 @@ use std::{
 };
 
 use self::{
-    ast::Expr,
-    parse_error::{ParseError, SyntaxError},
+    ast::{Expr, Stmt},
+    parse_error::{ParseError, ParseResult, SyntaxError},
 };
 
 pub mod ast;
@@ -33,7 +33,17 @@ impl<T: Read + Seek> Parser<T> {
         }
     }
 
-    pub fn synchronize(&mut self) -> Result<(), ParseError> {
+    pub fn parse(&mut self) -> ParseResult<Vec<Stmt>> {
+        let mut statements = vec![];
+
+        while self.peek()?.is_some() {
+            statements.push(self.statement()?);
+        }
+
+        Ok(statements)
+    }
+
+    pub fn synchronize(&mut self) -> ParseResult<()> {
         let token = self.advance()?;
 
         if let Some(token) = token {
@@ -58,11 +68,39 @@ impl<T: Read + Seek> Parser<T> {
         Ok(())
     }
 
-    pub fn expression(&mut self) -> Result<Box<Expr>, ParseError> {
+    pub fn statement(&mut self) -> ParseResult<Stmt> {
+        if let Some(operator) = self.peek()?.cloned() {
+            let (stmt, error_message) = match operator.kind() {
+                TokenKind::Print => (self.print_statement()?, "Expected ';' after expression."),
+                _ => (
+                    self.expression_statement()?,
+                    "Expected ';' after expression.",
+                ),
+            };
+
+            self.consume(TokenKind::Semicolon, Some(error_message.into()))?;
+            Ok(stmt)
+        } else {
+            Err(SyntaxError::MissingExpression(Location::EOF))?
+        }
+    }
+
+    pub fn expression_statement(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expression()?;
+        Ok(Stmt::Expression(*expr))
+    }
+
+    pub fn print_statement(&mut self) -> ParseResult<Stmt> {
+        self.advance()?;
+        let expr = self.expression()?;
+        Ok(Stmt::Print(*expr))
+    }
+
+    pub fn expression(&mut self) -> ParseResult<Box<Expr>> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn equality(&mut self) -> ParseResult<Box<Expr>> {
         let mut expr = self.comparison()?;
 
         while let Some(operator) = self.peek()?.cloned() {
@@ -80,7 +118,7 @@ impl<T: Read + Seek> Parser<T> {
         Ok(expr)
     }
 
-    pub fn comparison(&mut self) -> Result<Box<Expr>, ParseError> {
+    pub fn comparison(&mut self) -> ParseResult<Box<Expr>> {
         let mut expr = self.term()?;
 
         while let Some(operator) = self.peek()?.cloned() {
@@ -101,7 +139,7 @@ impl<T: Read + Seek> Parser<T> {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn term(&mut self) -> ParseResult<Box<Expr>> {
         let mut expr = self.factor()?;
 
         while let Some(operator) = self.peek()?.cloned() {
@@ -119,7 +157,7 @@ impl<T: Read + Seek> Parser<T> {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn factor(&mut self) -> ParseResult<Box<Expr>> {
         let mut expr = self.unary()?;
 
         while let Some(operator) = self.peek()?.cloned() {
@@ -137,7 +175,7 @@ impl<T: Read + Seek> Parser<T> {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn unary(&mut self) -> ParseResult<Box<Expr>> {
         if let Some(operator) = self.peek()?.cloned() {
             match operator.kind() {
                 TokenKind::Bang | TokenKind::Minus => {
@@ -153,7 +191,7 @@ impl<T: Read + Seek> Parser<T> {
         self.primary()
     }
 
-    fn primary(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn primary(&mut self) -> ParseResult<Box<Expr>> {
         macro_rules! literal {
             ($token:expr) => {{
                 self.advance()?;
@@ -179,7 +217,7 @@ impl<T: Read + Seek> Parser<T> {
         }
     }
 
-    fn grouping(&mut self, token: Token) -> Result<Box<Expr>, ParseError> {
+    fn grouping(&mut self, token: Token) -> ParseResult<Box<Expr>> {
         self.advance()?;
         let expr = self.expression()?;
 
@@ -203,6 +241,22 @@ impl<T: Read + Seek> Parser<T> {
                 None => Ok(None),
             },
             Some(s) => Ok(Some(s)),
+        }
+    }
+
+    fn consume(&mut self, kind: TokenKind, message: Option<String>) -> ParseResult<()> {
+        let error_message = message.unwrap_or_else(|| format!("Expected token {}", kind));
+
+        if let Some(token) = self.peek()? {
+            match token.kind() {
+                token if token.variant_eq(&kind) => {
+                    self.advance()?;
+                    Ok(())
+                }
+                _ => Err(SyntaxError::ExpectedToken(token.location(), error_message))?,
+            }
+        } else {
+            Err(SyntaxError::ExpectedToken(Location::EOF, error_message))?
         }
     }
 

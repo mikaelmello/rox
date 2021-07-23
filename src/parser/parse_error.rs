@@ -1,6 +1,8 @@
 use std::io;
 
-use crate::lexer::{lexical_error::LexicalError, location::Location, scan_result::ScanningError};
+use crate::lexer::{
+    lexical_error::LexicalError, location::Location, scan_result::ScanningError, token::TokenKind,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -14,9 +16,14 @@ pub enum SyntaxError {
     #[error("Unexpected expression \"{1}\"")]
     UnexpectedExpression(Location, String),
 
+    #[error("{1}")]
+    ExpectedToken(Location, String),
+
     #[error("Missing expression")]
     MissingExpression(Location),
 }
+
+pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Error, Debug)]
 pub enum ParseError {
