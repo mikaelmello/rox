@@ -1,12 +1,13 @@
-use crate::chunk::{Chunk, Instruction};
+use crate::chunk::{Chunk, Instruction, Value};
 
-pub struct Disassembler<'code> {
-    chunk: &'code Chunk,
+pub struct Disassembler<'vm> {
+    chunk: &'vm Chunk,
+    stack: Option<&'vm Vec<Value>>,
 }
 
-impl<'code> Disassembler<'code> {
-    pub fn new(chunk: &'code Chunk) -> Self {
-        Self { chunk }
+impl<'vm> Disassembler<'vm> {
+    pub fn new(chunk: &'vm Chunk, stack: Option<&'vm Vec<Value>>) -> Self {
+        Self { chunk, stack }
     }
 
     pub fn run(&self, name: &str) {
@@ -17,7 +18,9 @@ impl<'code> Disassembler<'code> {
         }
     }
 
-    fn instruction(&self, offset: usize, inst: Instruction) {
+    pub fn instruction(&self, offset: usize, inst: Instruction) {
+        self.stack();
+
         print!("{:04} ", offset);
 
         let line = self.chunk.get_line(offset);
@@ -30,7 +33,12 @@ impl<'code> Disassembler<'code> {
 
         match inst {
             Instruction::Return => self.simple_instruction("OP_RETURN"),
+            Instruction::Negate => self.simple_instruction("OP_NEGATE"),
             Instruction::Constant(idx) => self.constant_instruction("OP_CONSTANT", idx),
+            Instruction::Add => self.simple_instruction("OP_ADD"),
+            Instruction::Subtract => self.simple_instruction("OP_SUB"),
+            Instruction::Multiply => self.simple_instruction("OP_MUL"),
+            Instruction::Divide => self.simple_instruction("OP_DIV"),
         }
     }
 
@@ -41,5 +49,15 @@ impl<'code> Disassembler<'code> {
     fn constant_instruction(&self, msg: &'static str, idx: u16) {
         let value = self.chunk.constants[idx as usize];
         println!("{:<16} {:4} ({:?})", msg, idx, value);
+    }
+
+    fn stack(&self) {
+        if let Some(stack) = self.stack {
+            print!(" S: ");
+            for &value in stack.iter() {
+                print!("[{:?}]", value);
+            }
+            println!();
+        }
     }
 }

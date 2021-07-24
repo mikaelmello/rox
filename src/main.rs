@@ -1,7 +1,6 @@
 use chunk::{Chunk, Instruction, Value};
-use clap::Clap;
 use debug::Disassembler;
-use opts::Opts;
+use vm::Vm;
 
 mod chunk;
 mod debug;
@@ -18,10 +17,14 @@ fn main() {
     let constant = code.add_constant(Value::Number(123.34)).unwrap();
 
     code.write(Instruction::Constant(constant), 123);
+    code.write(Instruction::Negate, 123);
+    code.write(Instruction::Constant(constant), 123);
+    code.write(Instruction::Negate, 123);
+    code.write(Instruction::Subtract, 123);
     code.write(Instruction::Return, 123);
 
-    let disassembler = Disassembler::new(&code);
-    disassembler.run("DEBUG");
+    let mut vm = Vm::new(&code);
+    vm.interpret().unwrap();
 
     return;
 

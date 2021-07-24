@@ -4,6 +4,11 @@ use std::convert::TryFrom;
 pub enum Instruction {
     Return,
     Constant(u16),
+    Negate,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
