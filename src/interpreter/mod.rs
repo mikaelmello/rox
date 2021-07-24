@@ -16,6 +16,7 @@ impl Interpret for Stmt {
                 println!("{}", result);
                 Ok(Literal::new(LiteralKind::Nil, result.location()))
             }
+            Stmt::Var(name, initializer) => Ok(Literal::new(LiteralKind::Nil, name.location())),
         }
     }
 }
@@ -152,6 +153,7 @@ impl Interpret for Expr {
                     },
                 }
             }
+            Expr::Variable(name) => Ok(Literal::new(LiteralKind::Nil, name.location())),
         }
     }
 }

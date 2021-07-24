@@ -32,18 +32,24 @@ impl<'sourcecode> Parser<'sourcecode> {
         let mut statements = vec![];
 
         while self.peek().is_some() {
-            statements.push(self.statement()?);
+            match self.statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(_) => {
+                    // todo add error to list
+                    self.synchronize();
+                }
+            }
         }
 
         Ok(statements)
     }
 
-    pub fn synchronize(&mut self) -> ParseResult<()> {
+    pub fn synchronize(&mut self) {
         let token = self.advance();
 
         if let Some(token) = token {
             if token.kind() == TokenKind::Semicolon {
-                return Ok(());
+                return;
             }
         }
 
@@ -55,12 +61,55 @@ impl<'sourcecode> Parser<'sourcecode> {
                 | TokenKind::If
                 | TokenKind::While
                 | TokenKind::Print
-                | TokenKind::Return => return Ok(()),
+                | TokenKind::Return => return,
                 _ => self.advance(),
             };
         }
+    }
 
-        Ok(())
+    pub fn declaration(&mut self) -> ParseResult<Stmt> {
+        if let Some(token) = self.peek() {
+            match token.kind() {
+                TokenKind::Var => self.var_declaration(),
+                _ => self.statement(),
+            }
+        } else {
+            Err(ParseError::new(
+                ParseErrorKind::MissingExpression,
+                Location::EOF,
+            ))
+        }
+    }
+
+    pub fn var_declaration(&mut self) -> ParseResult<Stmt> {
+        let name = self.consume(TokenKind::Identifier, Some("Missing variable name".into()))?;
+
+        let identifier = name.into();
+        if let Some(operator) = self.peek() {
+            match operator.kind() {
+                TokenKind::Equal => {
+                    let expr = self.expression()?;
+                    self.consume(
+                        TokenKind::Semicolon,
+                        Some("Expect ';' after variable declaration.".into()),
+                    )?;
+
+                    return Ok(Stmt::Var(identifier, Some(*expr)));
+                }
+                TokenKind::Semicolon => {
+                    return Ok(Stmt::Var(identifier, None));
+                }
+                _ => Err(ParseError::new(
+                    ParseErrorKind::ExpectedToken("Expect ';' after variable declaration.".into()),
+                    Location::EOF,
+                ))?,
+            }
+        } else {
+            Err(ParseError::new(
+                ParseErrorKind::MissingExpression,
+                Location::EOF,
+            ))?
+        }
     }
 
     pub fn statement(&mut self) -> ParseResult<Stmt> {
@@ -282,13 +331,13 @@ impl<'sourcecode> Parser<'sourcecode> {
         }
     }
 
-    fn consume(&mut self, kind: TokenKind, message: Option<String>) -> ParseResult<()> {
+    fn consume(&mut self, kind: TokenKind, message: Option<String>) -> ParseResult<Token> {
         let error_message = message.unwrap_or_else(|| format!("Expected token {}", kind));
 
         if let Some(token) = self.peek() {
             if token.kind() == kind {
                 self.advance();
-                Ok(())
+                Ok(token)
             } else {
                 Err(ParseError::new(
                     ParseErrorKind::ExpectedToken(error_message),

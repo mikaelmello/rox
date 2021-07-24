@@ -8,6 +8,7 @@ use std::fmt::{Debug, Display};
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
+    Var(Identifier, Option<Expr>),
 }
 
 pub enum Expr {
@@ -15,6 +16,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(Literal),
     Unary(UnaryOp, Box<Expr>),
+    Variable(Identifier),
 }
 
 impl Debug for Expr {
@@ -24,6 +26,25 @@ impl Debug for Expr {
             Expr::Grouping(expression) => write!(f, "(group {:?})", expression),
             Expr::Literal(value) => write!(f, "{:?}", value),
             Expr::Unary(op, expression) => write!(f, "({:?} {:?})", op, expression),
+            Expr::Variable(name) => write!(f, "{:?}", name),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Identifier(String, Location);
+
+impl Identifier {
+    pub fn location(&self) -> Location {
+        self.1
+    }
+}
+
+impl<'sourcecode> From<Token<'sourcecode>> for Identifier {
+    fn from(t: Token) -> Self {
+        match t.kind() {
+            TokenKind::Identifier => Identifier(t.lexeme().to_string(), t.location()),
+            _ => panic!("Should not be called"),
         }
     }
 }
