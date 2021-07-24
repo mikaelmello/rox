@@ -1,8 +1,7 @@
+use crate::runner;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::io::{self, Write};
-
-use crate::runner;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 

@@ -1,10 +1,9 @@
-use core::panic;
-use std::fmt::{Debug, Display};
-
 use crate::{
     location::Location,
     scanner::{Token, TokenKind},
 };
+use core::panic;
+use std::fmt::{Debug, Display};
 
 pub enum Stmt {
     Expression(Expr),

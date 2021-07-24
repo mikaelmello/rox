@@ -1,6 +1,5 @@
-use std::fmt::Display;
-
 use crate::location::Location;
+use std::fmt::Display;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

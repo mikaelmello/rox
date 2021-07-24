@@ -1,6 +1,5 @@
-use crate::location::Location;
-
 use super::{token::TokenErrorKind, Token, TokenKind};
+use crate::location::Location;
 
 pub struct Scanner<'sourcecode> {
     code: &'sourcecode str,

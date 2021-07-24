@@ -1,6 +1,5 @@
-use std::fmt::Display;
-
 use crate::location::Location;
+use std::fmt::Display;
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Hash)]
 pub enum TokenErrorKind {

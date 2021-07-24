@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use self::{
     ast::{Expr, Stmt},
     parse_error::{ParseErrorKind, ParseResult},
@@ -12,6 +10,7 @@ use crate::{
     },
     scanner::{scanner::TokenIter, Scanner, Token, TokenKind},
 };
+use std::cmp::max;
 
 pub mod ast;
 mod parse_error;

@@ -1,6 +1,5 @@
-use thiserror::Error;
-
 use crate::location::Location;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
