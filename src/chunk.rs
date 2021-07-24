@@ -56,7 +56,7 @@ impl Chunk {
     }
 
     pub fn add_constant(&mut self, value: Value) -> Result<u16, ()> {
-        let index = self.code.len();
+        let index = self.constants.len();
 
         match u16::try_from(index) {
             Ok(index) => {

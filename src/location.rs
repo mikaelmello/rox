@@ -28,6 +28,11 @@ impl Location {
     pub fn offset(&self) -> usize {
         self.offset
     }
+
+    #[inline]
+    pub fn line(&self) -> usize {
+        self.position.0
+    }
 }
 
 impl Display for Location {

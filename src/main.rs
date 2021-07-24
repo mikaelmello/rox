@@ -1,8 +1,8 @@
-use chunk::{Chunk, Instruction, Value};
-use debug::Disassembler;
-use vm::Vm;
+use clap::Clap;
+use opts::Opts;
 
 mod chunk;
+mod compiler;
 mod debug;
 mod error;
 mod location;
@@ -13,25 +13,10 @@ mod scanner;
 mod vm;
 
 fn main() {
-    let mut code = Chunk::new();
-    let constant = code.add_constant(Value::Number(123.34)).unwrap();
+    let opts: Opts = Opts::parse();
 
-    code.write(Instruction::Constant(constant), 123);
-    code.write(Instruction::Negate, 123);
-    code.write(Instruction::Constant(constant), 123);
-    code.write(Instruction::Negate, 123);
-    code.write(Instruction::Subtract, 123);
-    code.write(Instruction::Return, 123);
-
-    let mut vm = Vm::new(&code);
-    vm.interpret().unwrap();
-
-    return;
-
-    // let opts: Opts = Opts::parse();
-
-    // match opts.script {
-    //     Some(path) => runner::eval_file(&path),
-    //     None => repl::repl().unwrap(),
-    // }
+    match opts.script {
+        Some(path) => runner::eval_file(&path),
+        None => repl::repl().unwrap(),
+    }
 }

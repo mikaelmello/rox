@@ -1,17 +1,18 @@
 use crate::{
     chunk::{Chunk, Instruction, Value},
+    compiler::compile,
     debug::Disassembler,
     error::{RoxError, RoxResult},
 };
 
-pub struct Vm<'code> {
+pub struct Vm {
     ip: usize,
-    chunk: &'code Chunk,
+    chunk: Chunk,
     stack: Vec<Value>,
 }
 
-impl<'code> Vm<'code> {
-    pub fn new(chunk: &'code Chunk) -> Self {
+impl Vm {
+    pub fn new(chunk: Chunk) -> Self {
         Self {
             chunk,
             ip: 0,
@@ -19,7 +20,13 @@ impl<'code> Vm<'code> {
         }
     }
 
-    pub fn interpret(&mut self) -> RoxResult<()> {
+    pub fn interpret(&mut self, code: &str) -> RoxResult<()> {
+        self.chunk = match compile(code) {
+            Ok(chunk) => chunk,
+            Err(_) => Err(RoxError::CompileError)?,
+        };
+        self.ip = 0;
+
         self.run()
     }
 
@@ -32,7 +39,7 @@ impl<'code> Vm<'code> {
 
             #[cfg(feature = "debug_trace_execution")]
             {
-                let dis = Disassembler::new(self.chunk, Some(&self.stack));
+                let dis = Disassembler::new(&self.chunk, Some(&self.stack));
                 dis.instruction(self.ip, *inst);
             }
 

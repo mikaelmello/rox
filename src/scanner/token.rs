@@ -5,6 +5,7 @@ use std::fmt::Display;
 pub enum TokenErrorKind {
     UnterminatedString,
     InvalidLexeme,
+    SyntheticToken,
 }
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Hash)]
@@ -130,6 +131,15 @@ impl<'sourcecode> Token<'sourcecode> {
         }
     }
 
+    pub fn synthetic(text: &'sourcecode str) -> Self {
+        Self {
+            kind: TokenKind::Error(TokenErrorKind::SyntheticToken),
+            lexeme: text,
+            start_loc: Location::default(),
+            end_loc: Location::default(),
+        }
+    }
+
     pub fn kind(&self) -> TokenKind {
         self.kind
     }
@@ -140,5 +150,9 @@ impl<'sourcecode> Token<'sourcecode> {
 
     pub fn location(&self) -> Location {
         self.start_loc
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.kind, TokenKind::Error(_))
     }
 }

@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::scanner::Scanner;
+use crate::{chunk::Chunk, scanner::Scanner, vm::Vm};
 
 pub fn eval_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Something went wrong reading the file");
@@ -8,8 +8,13 @@ pub fn eval_file(path: &str) {
     let _ = eval(&contents);
 }
 
-pub fn eval(expr: &str) -> Vec<String> {
-    let scanner = Scanner::new(expr);
+pub fn eval(expr: &str) -> String {
+    let mut vm = Vm::new(Chunk::new());
 
-    scanner.into_iter().map(|t| format!("{:?}", t)).collect()
+    match vm.interpret(expr) {
+        Ok(_) => "",
+        Err(crate::error::RoxError::CompileError) => "Compilation error",
+        Err(crate::error::RoxError::RuntimeError) => "Runtime error",
+    }
+    .into()
 }
