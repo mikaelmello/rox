@@ -1,10 +1,8 @@
 use clap::Clap;
 use opts::Opts;
 
-mod interpreter;
 mod location;
 mod opts;
-mod parser;
 mod repl;
 mod runner;
 mod scanner;
