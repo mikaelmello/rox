@@ -7,6 +7,11 @@ pub struct Location {
 }
 
 impl Location {
+    pub const EOF: Self = Self {
+        offset: 0,
+        position: (0, 0),
+    };
+
     pub fn ln(&mut self) {
         self.position = (self.position.0.saturating_add(1), 0);
     }
@@ -27,7 +32,11 @@ impl Location {
 
 impl Display for Location {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "{}:{}", self.position.0, self.position.1)
+        if *self == Location::EOF {
+            write!(fmt, "EOF")
+        } else {
+            write!(fmt, "{}:{}", self.position.0, self.position.1)
+        }
     }
 }
 

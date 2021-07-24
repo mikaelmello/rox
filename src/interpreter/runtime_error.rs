@@ -1,5 +1,6 @@
-use crate::lexer::location::Location;
 use thiserror::Error;
+
+use crate::location::Location;
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
@@ -10,5 +11,5 @@ pub enum RuntimeError {
     DvisionByZero(Location),
 
     #[error("'{0}' not supported between instances of '{1}' and '{2}'")]
-    OperationNotSupported(String, String, String, Location),
+    OperationNotSupported(&'static str, &'static str, &'static str, Location),
 }

@@ -1,6 +1,5 @@
-use crate::parser::ast::{BinOp, Expr, Literal, Stmt, UnaryOp};
-
 use self::runtime_error::RuntimeError;
+use crate::parser::ast::{BinOp, Expr, Literal, LiteralKind, Stmt, UnaryOp};
 
 mod runtime_error;
 
@@ -15,7 +14,7 @@ impl Interpret for Stmt {
             Stmt::Print(expr) => {
                 let result = expr.evaluate()?;
                 println!("{}", result);
-                Ok(Literal::Nil(result.location()))
+                Ok(Literal::new(LiteralKind::Nil, result.location()))
             }
         }
     }
@@ -40,91 +39,98 @@ impl Interpret for Expr {
                 }
 
                 match op {
-                    BinOp::Plus => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Number(l + r, loc))
+                    BinOp::Plus => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Number(l + r), left.location()))
                         }
-                        (Literal::String(l, loc), Literal::String(r, _)) => {
-                            Ok(Literal::String(l + &r, loc))
-                        }
-                        (Literal::String(l, loc), rhs) => {
-                            Ok(Literal::String(l + &rhs.to_string(), loc))
-                        }
-                        (lhs, Literal::String(r, loc)) => {
-                            Ok(Literal::String(lhs.to_string() + &r, loc))
-                        }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (LiteralKind::String(l), LiteralKind::String(r)) => Ok(Literal::new(
+                            LiteralKind::String(l.clone() + r),
+                            left.location(),
+                        )),
+                        (LiteralKind::String(l), _) => Ok(Literal::new(
+                            LiteralKind::String(l.clone() + &right.to_string()),
+                            left.location(),
+                        )),
+                        (_, LiteralKind::String(r)) => Ok(Literal::new(
+                            LiteralKind::String(left.to_string() + r),
+                            left.location(),
+                        )),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::Minus => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Number(l - r, loc))
+                    BinOp::Minus => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Number(l - r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::Star => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Number(l * r, loc))
+                    BinOp::Star => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Number(l * r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::Slash => match (left, right) {
-                        (Literal::Number(_, _), Literal::Number(r, loc)) if r == 0f64 => {
-                            Err(RuntimeError::DvisionByZero(loc))
+                    BinOp::Slash => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(_), LiteralKind::Number(r)) if *r == 0f64 => {
+                            Err(RuntimeError::DvisionByZero(right.location()))
                         }
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Number(l / r, loc))
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Number(l / r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::BangEqual => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l != r, loc))
+                    BinOp::BangEqual => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l != r), left.location()))
                         }
-                        (Literal::Bool(l, loc), Literal::Bool(r, _)) => {
-                            Ok(Literal::Bool(l != r, loc))
+                        (LiteralKind::Bool(l), LiteralKind::Bool(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l != r), left.location()))
                         }
-                        (Literal::String(l, loc), Literal::String(r, _)) => {
-                            Ok(Literal::Bool(l != r, loc))
+                        (LiteralKind::String(l), LiteralKind::String(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l != r), left.location()))
                         }
-                        (Literal::Nil(loc), Literal::Nil(_)) => Ok(Literal::Bool(false, loc)),
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (LiteralKind::Nil, LiteralKind::Nil) => {
+                            Ok(Literal::new(LiteralKind::Bool(false), left.location()))
+                        }
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::EqualEqual => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l == r, loc))
+                    BinOp::EqualEqual => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l == r), left.location()))
                         }
-                        (Literal::Bool(l, loc), Literal::Bool(r, _)) => {
-                            Ok(Literal::Bool(l == r, loc))
+                        (LiteralKind::Bool(l), LiteralKind::Bool(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l == r), left.location()))
                         }
-                        (Literal::String(l, loc), Literal::String(r, _)) => {
-                            Ok(Literal::Bool(l == r, loc))
+                        (LiteralKind::String(l), LiteralKind::String(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l == r), left.location()))
                         }
-                        (Literal::Nil(loc), Literal::Nil(_)) => Ok(Literal::Bool(true, loc)),
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (LiteralKind::Nil, LiteralKind::Nil) => {
+                            Ok(Literal::new(LiteralKind::Bool(true), left.location()))
+                        }
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::Greater => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l > r, loc))
+                    BinOp::Greater => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l > r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::GreaterEqual => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l >= r, loc))
+                    BinOp::GreaterEqual => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l >= r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::Less => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l < r, loc))
+                    BinOp::Less => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l < r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
-                    BinOp::LessEqual => match (left, right) {
-                        (Literal::Number(l, loc), Literal::Number(r, _)) => {
-                            Ok(Literal::Bool(l <= r, loc))
+                    BinOp::LessEqual => match (left.literal(), right.literal()) {
+                        (LiteralKind::Number(l), LiteralKind::Number(r)) => {
+                            Ok(Literal::new(LiteralKind::Bool(l <= r), left.location()))
                         }
-                        (lhs, rhs) => not_supported!(op, lhs, rhs),
+                        (_, _) => not_supported!(op, left, right),
                     },
                 }
             }
@@ -134,10 +140,15 @@ impl Interpret for Expr {
                 let val = expr.evaluate()?;
 
                 match op {
-                    UnaryOp::Bang => Ok(Literal::Bool(!val.is_truthy(), val.location())),
-                    UnaryOp::Minus => match val {
-                        Literal::Number(n, l) => Ok(Literal::Number(-n, l)),
-                        l => Err(RuntimeError::NotNumberOperand(l.location())),
+                    UnaryOp::Bang => Ok(Literal::new(
+                        LiteralKind::Bool(!val.is_truthy()),
+                        val.location(),
+                    )),
+                    UnaryOp::Minus => match val.literal() {
+                        LiteralKind::Number(n) => {
+                            Ok(Literal::new(LiteralKind::Number(-n), val.location()))
+                        }
+                        _ => Err(RuntimeError::NotNumberOperand(val.location())),
                     },
                 }
             }

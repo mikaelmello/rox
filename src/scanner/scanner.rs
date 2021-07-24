@@ -1,6 +1,6 @@
 use crate::location::Location;
 
-use super::{Token, TokenKind};
+use super::{token::TokenErrorKind, Token, TokenKind};
 
 pub struct Scanner<'sourcecode> {
     code: &'sourcecode str,
@@ -33,7 +33,7 @@ impl<'sourcecode> Scanner<'sourcecode> {
         macro_rules! check_invalid_lexeme {
             ($expr:expr) => {{
                 if invalid_lexeme {
-                    return self.error_token("Invalid lexeme");
+                    return self.error_token(TokenErrorKind::InvalidLexeme);
                 }
                 return $expr;
             }};
@@ -114,7 +114,7 @@ impl<'sourcecode> Scanner<'sourcecode> {
         }
 
         if self.is_at_end() {
-            self.error_token("Unterminated string")
+            self.error_token(TokenErrorKind::UnterminatedString)
         } else {
             self.advance();
             self.make_token(TokenKind::String)
@@ -151,13 +151,12 @@ impl<'sourcecode> Scanner<'sourcecode> {
         }
     }
 
-    fn error_token(&self, message: &'static str) -> Token<'sourcecode> {
+    fn error_token(&self, kind: TokenErrorKind) -> Token<'sourcecode> {
         Token::new(
-            TokenKind::Error,
+            TokenKind::Error(kind),
             self.cur_lexeme(),
             self.start,
             self.current,
-            Some(message),
         )
     }
 
@@ -193,34 +192,26 @@ impl<'sourcecode> Scanner<'sourcecode> {
     }
 
     fn make_token(&self, kind: TokenKind) -> Token<'sourcecode> {
-        Token::new(kind, self.cur_lexeme(), self.start, self.current, None)
+        Token::new(kind, self.cur_lexeme(), self.start, self.current)
     }
 
     pub fn into_iter(self) -> TokenIter<'sourcecode> {
-        TokenIter {
-            scanner: self,
-            eof: false,
-        }
+        TokenIter { scanner: self }
     }
 }
 pub struct TokenIter<'sourcecode> {
     scanner: Scanner<'sourcecode>,
-    eof: bool,
 }
 
 impl<'sourcecode> Iterator for TokenIter<'sourcecode> {
     type Item = Token<'sourcecode>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.eof {
+        let token = self.scanner.next_token();
+
+        if token.kind() == TokenKind::Eof {
             None
         } else {
-            let token = self.scanner.next_token();
-
-            if token.kind() == TokenKind::Eof {
-                self.eof = true;
-            }
-
             Some(token)
         }
     }

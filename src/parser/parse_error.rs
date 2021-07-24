@@ -1,42 +1,52 @@
-use std::io;
+use std::fmt::Display;
 
-use crate::lexer::{lexical_error::LexicalError, location::Location, scan_result::ScanningError};
+use crate::location::Location;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SyntaxError {
-    #[error("{0}")]
-    LexicalError(#[from] LexicalError),
+pub struct ParseError {
+    #[source]
+    src: ParseErrorKind,
+    loc: Location,
+}
+
+impl ParseError {
+    pub fn new(src: ParseErrorKind, loc: Location) -> Self {
+        Self { src, loc }
+    }
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error {}\n    {}\n", self.loc, self.src)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ParseErrorKind {
+    #[error("Invalid lexeme \"{0}\"")]
+    InvalidLexeme(String),
+
+    #[error("Invalid number literal {0}")]
+    InvalidNumberLiteral(String),
+
+    #[error("String literal is not properly formatted")]
+    InvalidStringLiteral,
+
+    #[error("String literal is not terminated")]
+    UnterminatedString,
 
     #[error("Missing closing parenthesis")]
-    MissingClosingParenthesis(Location),
+    MissingClosingParenthesis,
 
-    #[error("Unexpected expression \"{1}\"")]
-    UnexpectedExpression(Location, String),
+    #[error("Unexpected expression \"{0}\"")]
+    UnexpectedExpression(String),
 
-    #[error("{1}")]
-    ExpectedToken(Location, String),
+    #[error("{0}")]
+    ExpectedToken(String),
 
     #[error("Missing expression")]
-    MissingExpression(Location),
+    MissingExpression,
 }
 
 pub type ParseResult<T> = Result<T, ParseError>;
-
-#[derive(Error, Debug)]
-pub enum ParseError {
-    #[error("{0}")]
-    SyntaxError(#[from] SyntaxError),
-
-    #[error("IO Error: {0}")]
-    IO(#[from] io::Error),
-}
-
-impl From<ScanningError> for ParseError {
-    fn from(err: ScanningError) -> Self {
-        match err {
-            ScanningError::IO(err) => ParseError::IO(err),
-            ScanningError::LexicalError(err) => ParseError::SyntaxError(err.into()),
-        }
-    }
-}

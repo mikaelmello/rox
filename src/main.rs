@@ -1,9 +1,7 @@
 use clap::Clap;
 use opts::Opts;
 
-mod error;
 mod interpreter;
-mod lexer;
 mod location;
 mod opts;
 mod parser;

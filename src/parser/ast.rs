@@ -1,9 +1,9 @@
 use core::panic;
 use std::fmt::{Debug, Display};
 
-use crate::lexer::{
+use crate::{
     location::Location,
-    token::{Token, TokenKind},
+    scanner::{Token, TokenKind},
 };
 
 pub enum Stmt {
@@ -44,23 +44,23 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn symbol(&self) -> String {
+    pub fn symbol(&self) -> &'static str {
         match self {
-            BinOp::Minus => String::from("-"),
-            BinOp::Plus => String::from("+"),
-            BinOp::Slash => String::from("/"),
-            BinOp::Star => String::from("*"),
-            BinOp::BangEqual => String::from("!="),
-            BinOp::EqualEqual => String::from("=="),
-            BinOp::Greater => String::from(">"),
-            BinOp::GreaterEqual => String::from(">="),
-            BinOp::Less => String::from("<"),
-            BinOp::LessEqual => String::from("<="),
+            BinOp::Minus => "-",
+            BinOp::Plus => "+",
+            BinOp::Slash => "/",
+            BinOp::Star => "*",
+            BinOp::BangEqual => "!=",
+            BinOp::EqualEqual => "==",
+            BinOp::Greater => ">",
+            BinOp::GreaterEqual => ">=",
+            BinOp::Less => "<",
+            BinOp::LessEqual => "<=",
         }
     }
 }
 
-impl From<Token> for BinOp {
+impl<'sourcecode> From<Token<'sourcecode>> for BinOp {
     fn from(t: Token) -> Self {
         match t.kind() {
             TokenKind::Minus => BinOp::Minus,
@@ -84,7 +84,7 @@ pub enum UnaryOp {
     Bang,
 }
 
-impl From<Token> for UnaryOp {
+impl<'sourcecode> From<Token<'sourcecode>> for UnaryOp {
     fn from(t: Token) -> Self {
         match t.kind() {
             TokenKind::Minus => UnaryOp::Minus,
@@ -94,50 +94,59 @@ impl From<Token> for UnaryOp {
     }
 }
 
-#[derive(Debug)]
-pub enum Literal {
-    Bool(bool, Location),
-    Number(f64, Location),
-    String(String, Location),
-    Nil(Location),
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralKind {
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Nil,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Literal {
+    loc: Location,
+    literal: LiteralKind,
 }
 
 impl Literal {
-    pub fn symbol(&self) -> String {
-        match self {
-            Literal::Bool(_, _) => String::from("bool"),
-            Literal::Number(_, _) => String::from("number"),
-            Literal::String(_, _) => String::from("string"),
-            Literal::Nil(_) => String::from("nil"),
+    pub fn new(literal: LiteralKind, loc: Location) -> Self {
+        Self { loc, literal }
+    }
+
+    pub fn symbol(&self) -> &'static str {
+        match self.literal {
+            LiteralKind::Bool(_) => "bool",
+            LiteralKind::Number(_) => "number",
+            LiteralKind::String(_) => "string",
+            LiteralKind::Nil => "nil",
         }
     }
 
     pub fn is_truthy(&self) -> bool {
-        match self {
-            Literal::Bool(b, _) => *b,
-            Literal::Number(_, _) => true,
-            Literal::String(_, _) => true,
-            Literal::Nil(_) => false,
+        match self.literal {
+            LiteralKind::Bool(b) => b,
+            LiteralKind::Number(_) => true,
+            LiteralKind::String(_) => true,
+            LiteralKind::Nil => false,
         }
     }
 
     pub fn location(&self) -> Location {
-        match self {
-            Literal::Bool(_, l) => *l,
-            Literal::Number(_, l) => *l,
-            Literal::String(_, l) => *l,
-            Literal::Nil(l) => *l,
-        }
+        self.loc
+    }
+
+    pub fn literal(&self) -> &LiteralKind {
+        &self.literal
     }
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Bool(val, _) => write!(f, "{}", val),
-            Literal::Number(val, _) => write!(f, "{}", val),
-            Literal::String(val, _) => write!(f, "{}", val),
-            Literal::Nil(_) => Ok(()),
+        match &self.literal {
+            LiteralKind::Bool(val) => write!(f, "{}", *val),
+            LiteralKind::Number(val) => write!(f, "{}", *val),
+            LiteralKind::String(val) => write!(f, "{}", *val),
+            LiteralKind::Nil => Ok(()),
         }
     }
 }

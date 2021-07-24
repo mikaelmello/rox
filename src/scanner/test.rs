@@ -1,16 +1,11 @@
 mod test {
     use crate::location::Location;
+    use crate::scanner::token::TokenErrorKind;
     use crate::scanner::{Scanner, Token, TokenKind};
 
     macro_rules! token {
         ($kind:expr,$lexeme:expr,$start:expr,$end:expr) => {
-            Token::new(
-                $kind,
-                $lexeme,
-                Location::from($start),
-                Location::from($end),
-                None,
-            )
+            Token::new($kind, $lexeme, Location::from($start), Location::from($end))
         };
     }
 
@@ -79,6 +74,20 @@ mod test {
         vec![
             token!(TokenKind::String, "\"singleword\"", (0, 0, 0), (12, 0, 12)),
             token!(TokenKind::Eof, "", (12, 0, 12), (12, 0, 12)),
+        ]
+    );
+
+    test!(
+        unterminated_string,
+        "\"singleword\n\n",
+        vec![
+            token!(
+                TokenKind::Error(TokenErrorKind::UnterminatedString),
+                "\"singleword\n\n",
+                (0, 0, 0),
+                (11, 0, 11)
+            ),
+            token!(TokenKind::Eof, "", (11, 0, 11), (11, 0, 11)),
         ]
     );
 
