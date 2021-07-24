@@ -14,6 +14,8 @@ pub enum Instruction {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64),
+    Bool(bool),
+    Nil,
 }
 
 pub struct LineStart {
@@ -110,12 +112,19 @@ impl Chunk {
 mod test {
     use std::mem::size_of;
 
-    use crate::chunk::Instruction;
+    use crate::chunk::{Instruction, Value};
 
     #[test]
     fn instruction_is_at_most_32_bits() {
         // An instruction should be at most 32 bits; anything bigger and we've mis-defined some
         // variant
         assert!(size_of::<Instruction>() <= 4);
+    }
+
+    #[test]
+    fn value_is_at_most_32_bits() {
+        // An instruction should be at most 128 bits; anything bigger and we've mis-defined some
+        // variant
+        assert!(size_of::<Value>() <= 16);
     }
 }

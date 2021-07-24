@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{chunk::Chunk, scanner::Scanner, vm::Vm};
+use crate::{chunk::Chunk, vm::Vm};
 
 pub fn eval_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Something went wrong reading the file");
