@@ -2,9 +2,9 @@ use crate::{
     chunk::{Chunk, Instruction, Value},
     compiler::compile,
     debug::Disassembler,
-    error::{RoxError, RoxErrorKind, RoxResult},
-    location::Location,
+    error::{RoxError, RoxErrorKind, RoxResult, RuntimeError},
 };
+use core::panic;
 
 pub struct Vm {
     ip: usize,
@@ -32,10 +32,7 @@ impl Vm {
         loop {
             let inst = match self.chunk.code.get(self.ip) {
                 Some(inst) => inst,
-                None => Err(RoxError::new(
-                    RoxErrorKind::RuntimeError,
-                    Location::default(),
-                ))?,
+                None => panic!("Reached out-of-bounds of program"),
             };
 
             #[cfg(feature = "debug_trace_execution")]
@@ -50,13 +47,13 @@ impl Vm {
                 ($oper:tt) => {{
                     let b = match self.stack.pop() {
                         Some(Value::Number(val)) => val,
-                        Some(_) => todo!(),
-                        None => todo!(),
+                        Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                     };
                     let a = match self.stack.pop() {
                         Some(Value::Number(val)) => val,
-                        Some(_) => todo!(),
-                        None => todo!(),
+                        Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                     };
                     let res = a $oper b;
                     self.stack.push(Value::Number(res));
@@ -74,7 +71,7 @@ impl Vm {
                 Instruction::Constant(val) => {
                     let val = match self.chunk.constants.get(*val as usize) {
                         Some(val) => val,
-                        None => todo!(),
+                        None => Err(self.runtime_error(RuntimeError::InvalidConstantAddress))?,
                     };
 
                     self.stack.push(*val);
@@ -83,8 +80,8 @@ impl Vm {
                     Some(Value::Number(val)) => {
                         *val *= -1.0;
                     }
-                    Some(_) => todo!(),
-                    None => todo!(),
+                    Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
+                    None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                 },
                 Instruction::Add => binary_op!(+),
                 Instruction::Subtract => binary_op!(-),
@@ -92,5 +89,12 @@ impl Vm {
                 Instruction::Divide => binary_op!(/),
             }
         }
+    }
+
+    fn runtime_error(&mut self, kind: RuntimeError) -> RoxError {
+        RoxError::new(
+            RoxErrorKind::RuntimeError(kind),
+            self.chunk.get_line(self.ip),
+        )
     }
 }

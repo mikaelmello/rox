@@ -1,5 +1,4 @@
-use crate::location::Location;
-use std::fmt::Display;
+use std::{fmt::Display, usize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -24,29 +23,39 @@ pub enum CompilationError {
 }
 
 #[derive(Error, Debug)]
+pub enum RuntimeError {
+    #[error("Missing operand for operation")]
+    MissingOperand,
+    #[error("Invalid operand type for operation")]
+    InvalidOperand,
+    #[error("Invalid constant address")]
+    InvalidConstantAddress,
+}
+
+#[derive(Error, Debug)]
 pub enum RoxErrorKind {
     #[error("{0}")]
     CompilationError(#[from] CompilationError),
-    #[error("Runtime error")]
-    RuntimeError,
+    #[error("{0}")]
+    RuntimeError(#[from] RuntimeError),
 }
 
 #[derive(Error, Debug)]
 pub struct RoxError {
     #[source]
     pub src: RoxErrorKind,
-    pub loc: Location,
+    pub line: usize,
 }
 
 impl RoxError {
-    pub fn new(src: RoxErrorKind, loc: Location) -> Self {
-        Self { src, loc }
+    pub fn new(src: RoxErrorKind, line: usize) -> Self {
+        Self { src, line }
     }
 }
 
 impl Display for RoxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error {}\n    {}\n", self.loc, self.src)
+        write!(f, "{}", self.src)
     }
 }
 

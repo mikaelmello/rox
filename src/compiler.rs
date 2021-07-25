@@ -326,7 +326,10 @@ impl<'sourcecode> Parser<'sourcecode> {
     }
 
     fn error_at(&mut self, token: Token, kind: CompilationError) -> RoxError {
-        RoxError::new(RoxErrorKind::CompilationError(kind), token.location())
+        RoxError::new(
+            RoxErrorKind::CompilationError(kind),
+            token.location().line(),
+        )
     }
 }
 

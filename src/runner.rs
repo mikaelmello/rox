@@ -13,7 +13,7 @@ pub fn eval(expr: &str) {
 
     if let Err(errors) = vm.interpret(expr) {
         for err in errors {
-            eprintln!("[{}] Error: {}", err.loc, err.src);
+            eprintln!("[line {}] Error: {}", err.line, err.src);
         }
     }
 }
