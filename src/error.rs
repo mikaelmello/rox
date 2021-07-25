@@ -10,23 +10,14 @@ pub enum CompilationError {
     #[error("Invalid number literal {0}")]
     InvalidNumberLiteral(String),
 
-    #[error("String literal is not properly formatted")]
-    InvalidStringLiteral,
-
     #[error("String literal is not terminated")]
     UnterminatedString,
 
     #[error("Missing closing parenthesis")]
     MissingClosingParenthesis,
 
-    #[error("Unexpected token {0}")]
-    UnexpectedToken(String),
-
     #[error("Too many constants in one code section, limit is {0}")]
     TooManyConstants(u64),
-
-    #[error("{0}")]
-    ExpectedToken(String),
 
     #[error("Missing expression")]
     MissingExpression,

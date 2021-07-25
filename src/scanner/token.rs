@@ -151,8 +151,4 @@ impl<'sourcecode> Token<'sourcecode> {
     pub fn location(&self) -> Location {
         self.start_loc
     }
-
-    pub fn is_error(&self) -> bool {
-        matches!(self.kind, TokenKind::Error(_))
-    }
 }

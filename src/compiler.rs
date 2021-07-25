@@ -74,8 +74,6 @@ struct Parser<'sourcecode> {
     current: Token<'sourcecode>,
     previous: Token<'sourcecode>,
     chunks: Vec<Chunk>,
-    had_error: bool,
-    panic_mode: bool,
     errors: Vec<RoxError>,
 }
 
@@ -85,8 +83,6 @@ impl<'sourcecode> Parser<'sourcecode> {
             scanner: Scanner::new(code).into_iter(),
             previous: Token::synthetic(""),
             current: Token::synthetic(""),
-            had_error: false,
-            panic_mode: false,
             chunks: Vec::new(),
             errors: Vec::new(),
         }
@@ -266,7 +262,7 @@ impl<'sourcecode> Parser<'sourcecode> {
     }
 
     fn end_compiler(&mut self) {
-        if !self.had_error {
+        if !self.errors.is_empty() {
             #[cfg(feature = "debug_trace_execution")]
             {
                 let dis = Disassembler::new(self.current_chunk(), None);
