@@ -1,17 +1,15 @@
 use crate::runner;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::io::{self, Write};
+use std::io;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn repl() -> io::Result<()> {
-    let mut stdout = io::stdout();
-
     // `()` can be used when no completer is required
     let mut rl = Editor::<()>::new();
 
-    writeln!(stdout, "rox {}", VERSION)?;
+    println!("rox {}", VERSION);
 
     loop {
         let readline = rl.readline(">>> ");
@@ -23,9 +21,7 @@ pub fn repl() -> io::Result<()> {
 
                 rl.add_history_entry(line.as_str());
 
-                let result = runner::eval(&line);
-
-                write!(stdout, "{}\n", result)?;
+                runner::eval(&line);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

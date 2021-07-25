@@ -2,7 +2,8 @@ use crate::{
     chunk::{Chunk, Instruction, Value},
     compiler::compile,
     debug::Disassembler,
-    error::{RoxError, RoxResult},
+    error::{RoxError, RoxErrorKind, RoxResult},
+    location::Location,
 };
 
 pub struct Vm {
@@ -20,21 +21,21 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, code: &str) -> RoxResult<()> {
-        self.chunk = match compile(code) {
-            Ok(chunk) => chunk,
-            Err(_) => Err(RoxError::CompileError)?,
-        };
+    pub fn interpret(&mut self, code: &str) -> Result<(), Vec<RoxError>> {
+        self.chunk = compile(code)?;
         self.ip = 0;
 
-        self.run()
+        self.run().map_err(|err| vec![err])
     }
 
     fn run(&mut self) -> RoxResult<()> {
         loop {
             let inst = match self.chunk.code.get(self.ip) {
                 Some(inst) => inst,
-                None => return Err(RoxError::RuntimeError),
+                None => Err(RoxError::new(
+                    RoxErrorKind::RuntimeError,
+                    Location::default(),
+                ))?,
             };
 
             #[cfg(feature = "debug_trace_execution")]

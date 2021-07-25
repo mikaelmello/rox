@@ -1,7 +1,8 @@
 use crate::{
     chunk::{Chunk, Instruction, Value},
     debug::Disassembler,
-    scanner::{scanner::TokenIter, Scanner, Token, TokenKind},
+    error::{CompilationError, RoxError, RoxErrorKind},
+    scanner::{scanner::TokenIter, token::TokenErrorKind, Scanner, Token, TokenKind},
 };
 
 #[derive(Copy, Clone, PartialOrd, PartialEq)]
@@ -37,7 +38,7 @@ impl Precedence {
     }
 }
 
-type ParseFn<'sourcecode> = fn(&mut Parser<'sourcecode>) -> ();
+type ParseFn<'sourcecode> = fn(&mut Parser<'sourcecode>) -> Result<(), RoxError>;
 
 #[derive(Copy, Clone)]
 struct ParseRule<'sourcecode> {
@@ -75,6 +76,7 @@ struct Parser<'sourcecode> {
     chunks: Vec<Chunk>,
     had_error: bool,
     panic_mode: bool,
+    errors: Vec<RoxError>,
 }
 
 impl<'sourcecode> Parser<'sourcecode> {
@@ -86,29 +88,40 @@ impl<'sourcecode> Parser<'sourcecode> {
             had_error: false,
             panic_mode: false,
             chunks: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
-    pub fn compile(mut self) -> Result<Chunk, ()> {
+    pub fn compile(mut self) -> Result<Chunk, Vec<RoxError>> {
         self.chunks.push(Chunk::new());
 
-        self.advance();
-        self.expression();
+        match self.advance().and_then(|_| self.expression()) {
+            Ok(()) => {}
+            Err(err) => self.errors.push(err),
+        }
+
+        // if !matches!(self.current.kind(), TokenKind::Eof) {
+        //     let error = self.error_at_current(CompilationError::UnexpectedToken(
+        //         self.current.lexeme().to_string(),
+        //     ));
+        //     self.errors.push(error);
+        // }
+
         self.end_compiler();
 
-        if self.had_error {
-            Err(())
-        } else {
+        if self.errors.is_empty() {
             Ok(self.chunks.pop().unwrap())
+        } else {
+            Err(self.errors)
         }
     }
 
-    fn expression(&mut self) {
-        self.parse_precedence(Precedence::Assignment);
+    fn expression(&mut self) -> Result<(), RoxError> {
+        self.parse_precedence(Precedence::Assignment)
     }
 
-    fn parse_precedence(&mut self, precedence: Precedence) {
-        self.advance();
+    fn parse_precedence(&mut self, precedence: Precedence) -> Result<(), RoxError> {
+        self.advance()?;
 
         let rule = self.get_rule(self.previous.kind());
         let prefix_rule = rule.prefix;
@@ -116,32 +129,38 @@ impl<'sourcecode> Parser<'sourcecode> {
         let prefix_rule = match prefix_rule {
             Some(rule) => rule,
             None => {
-                self.error("Expect expression.");
-                return;
+                return Err(self.error(CompilationError::MissingExpression));
             }
         };
 
-        prefix_rule(self);
+        prefix_rule(self)?;
 
         while precedence <= self.get_rule(self.current.kind()).precedence {
-            self.advance();
+            self.advance()?;
+            println!("{:?} at main loop", self.previous.kind());
+            println!("{:?} at main loop", self.current.kind());
             let infix_rule = self
                 .get_rule(self.previous.kind())
                 .infix
                 .expect("Expect infix rule");
-            infix_rule(self);
+            infix_rule(self)?;
         }
+
+        Ok(())
     }
 
-    fn grouping(&mut self) {
-        self.expression();
-        self.consume(TokenKind::RightParen, "Expect ')' after expression")
+    fn grouping(&mut self) -> Result<(), RoxError> {
+        self.expression()?;
+        self.consume(
+            TokenKind::RightParen,
+            CompilationError::MissingClosingParenthesis,
+        )
     }
 
-    fn binary(&mut self) {
+    fn binary(&mut self) -> Result<(), RoxError> {
         let operator = self.previous.kind();
         let rule = self.get_rule(operator);
-        self.parse_precedence(rule.precedence.next());
+        self.parse_precedence(rule.precedence.next())?;
 
         match operator {
             TokenKind::Plus => self.emit(Instruction::Add),
@@ -149,29 +168,34 @@ impl<'sourcecode> Parser<'sourcecode> {
             TokenKind::Star => self.emit(Instruction::Multiply),
             TokenKind::Slash => self.emit(Instruction::Divide),
             _ => panic!("Invalid binary operator"),
-        };
+        }
+
+        Ok(())
     }
 
-    fn unary(&mut self) {
+    fn unary(&mut self) -> Result<(), RoxError> {
         let kind = self.previous.kind();
 
-        self.parse_precedence(Precedence::Unary);
+        self.parse_precedence(Precedence::Unary)?;
 
         match kind {
             TokenKind::Minus => self.emit(Instruction::Negate),
             _ => panic!("Invalid unary operator"),
         }
+
+        Ok(())
     }
 
-    fn number(&mut self) {
-        let value = match self.previous.lexeme().parse::<f64>() {
-            Ok(value) => value,
-            Err(_) => {
-                self.error("Invalid number lexeme");
-                return;
+    fn number(&mut self) -> Result<(), RoxError> {
+        match self.previous.lexeme().parse::<f64>() {
+            Ok(value) => {
+                self.emit_constant(Value::Number(value))?;
+                Ok(())
             }
-        };
-        self.emit_constant(Value::Number(value));
+            Err(_) => Err(self.error(CompilationError::InvalidNumberLiteral(
+                self.previous.lexeme().into(),
+            ))),
+        }
     }
 
     fn get_rule(&mut self, kind: TokenKind) -> ParseRule<'sourcecode> {
@@ -230,9 +254,11 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.current_chunk().write(instruction, line);
     }
 
-    fn emit_constant(&mut self, value: Value) {
-        let index = self.make_constant(value);
+    fn emit_constant(&mut self, value: Value) -> Result<(), RoxError> {
+        let index = self.make_constant(value)?;
         self.emit(Instruction::Constant(index));
+
+        Ok(())
     }
 
     fn emit_return(&mut self) {
@@ -250,13 +276,10 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.emit_return();
     }
 
-    fn make_constant(&mut self, value: Value) -> u16 {
+    fn make_constant(&mut self, value: Value) -> Result<u16, RoxError> {
         match self.current_chunk().add_constant(value) {
-            Ok(index) => index,
-            Err(_) => {
-                self.error("Too many constants in one chunk.");
-                0
-            }
+            Ok(index) => Ok(index),
+            Err(_) => Err(self.error(CompilationError::TooManyConstants(u16::MAX as u64))),
         }
     }
 
@@ -264,55 +287,53 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.chunks.last_mut().unwrap()
     }
 
-    fn consume(&mut self, kind: TokenKind, msg: &str) {
-        println!("{:?} {:?}", self.current.kind(), kind);
+    fn consume(&mut self, kind: TokenKind, error: CompilationError) -> Result<(), RoxError> {
         if self.current.kind() == kind {
-            self.advance();
-            return;
+            self.advance()?;
+            return Ok(());
         }
 
-        self.error_at_current(msg);
+        Err(self.error_at_current(error))
     }
 
-    fn advance(&mut self) {
+    fn advance(&mut self) -> Result<(), RoxError> {
         self.previous = self.current;
 
-        while let Some(token) = self.scanner.next() {
+        if let Some(token) = self.scanner.next() {
             self.current = token;
-            if token.is_error() {
-                todo!()
-            } else {
-                break;
+
+            match token.kind() {
+                TokenKind::Error(TokenErrorKind::InvalidLexeme) => {
+                    return Err(self.error(CompilationError::InvalidLexeme(token.lexeme().into())))
+                }
+                TokenKind::Error(TokenErrorKind::SyntheticToken) => {
+                    panic!("Unexpected synthetic token, this is a bug in the compiler");
+                }
+                TokenKind::Error(TokenErrorKind::UnterminatedString) => {
+                    return Err(self.error(CompilationError::UnterminatedString))
+                }
+                _ => {}
             }
-        }
-    }
 
-    fn error_at_current(&mut self, msg: &str) {
-        self.error_at(self.current, msg)
-    }
-
-    fn error(&mut self, msg: &str) {
-        self.error_at(self.previous, msg)
-    }
-
-    fn error_at(&mut self, token: Token, msg: &str) {
-        if self.panic_mode {
-            return;
+            println!("{:?} {:?}", self.previous.kind(), self.current.kind());
         }
 
-        self.panic_mode = true;
-        self.had_error = true;
+        Ok(())
+    }
 
-        eprint!("[{}] Error", token.location());
+    fn error_at_current(&mut self, kind: CompilationError) -> RoxError {
+        self.error_at(self.current, kind)
+    }
 
-        match token.kind() {
-            TokenKind::Error(_) => (),
-            _ => eprint!(" at '{}'", token.lexeme()),
-        };
-        eprintln!(": {}", msg);
+    fn error(&mut self, kind: CompilationError) -> RoxError {
+        self.error_at(self.previous, kind)
+    }
+
+    fn error_at(&mut self, token: Token, kind: CompilationError) -> RoxError {
+        RoxError::new(RoxErrorKind::CompilationError(kind), token.location())
     }
 }
 
-pub fn compile(code: &str) -> Result<Chunk, ()> {
+pub fn compile(code: &str) -> Result<Chunk, Vec<RoxError>> {
     Parser::new(code).compile()
 }

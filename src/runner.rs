@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{chunk::Chunk, vm::Vm};
+use crate::{chunk::Chunk, error::RoxError, vm::Vm};
 
 pub fn eval_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Something went wrong reading the file");
@@ -8,13 +8,12 @@ pub fn eval_file(path: &str) {
     let _ = eval(&contents);
 }
 
-pub fn eval(expr: &str) -> String {
+pub fn eval(expr: &str) {
     let mut vm = Vm::new(Chunk::new());
 
-    match vm.interpret(expr) {
-        Ok(_) => "",
-        Err(crate::error::RoxError::CompileError) => "Compilation error",
-        Err(crate::error::RoxError::RuntimeError) => "Runtime error",
+    if let Err(errors) = vm.interpret(expr) {
+        for err in errors {
+            eprintln!("[{}] Error: {}", err.loc, err.src);
+        }
     }
-    .into()
 }
