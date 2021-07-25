@@ -1,7 +1,7 @@
 use crate::{
     chunk::{Chunk, Instruction, Value},
     debug::Disassembler,
-    error::{CompilationError, RoxError, RoxErrorKind},
+    error::{CompilationError, RoxError, RoxErrorKind, RoxResult},
     scanner::{scanner::TokenIter, token::TokenErrorKind, Scanner, Token, TokenKind},
 };
 
@@ -38,7 +38,7 @@ impl Precedence {
     }
 }
 
-type ParseFn<'sourcecode> = fn(&mut Parser<'sourcecode>) -> Result<(), RoxError>;
+type ParseFn<'sourcecode> = fn(&mut Parser<'sourcecode>) -> RoxResult<()>;
 
 #[derive(Copy, Clone)]
 struct ParseRule<'sourcecode> {
@@ -112,11 +112,11 @@ impl<'sourcecode> Parser<'sourcecode> {
         }
     }
 
-    fn expression(&mut self) -> Result<(), RoxError> {
+    fn expression(&mut self) -> RoxResult<()> {
         self.parse_precedence(Precedence::Assignment)
     }
 
-    fn parse_precedence(&mut self, precedence: Precedence) -> Result<(), RoxError> {
+    fn parse_precedence(&mut self, precedence: Precedence) -> RoxResult<()> {
         self.advance()?;
 
         let rule = self.get_rule(self.previous.kind());
@@ -145,7 +145,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         Ok(())
     }
 
-    fn grouping(&mut self) -> Result<(), RoxError> {
+    fn grouping(&mut self) -> RoxResult<()> {
         self.expression()?;
         self.consume(
             TokenKind::RightParen,
@@ -153,7 +153,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         )
     }
 
-    fn binary(&mut self) -> Result<(), RoxError> {
+    fn binary(&mut self) -> RoxResult<()> {
         let operator = self.previous.kind();
         let rule = self.get_rule(operator);
         self.parse_precedence(rule.precedence.next())?;
@@ -169,7 +169,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         Ok(())
     }
 
-    fn unary(&mut self) -> Result<(), RoxError> {
+    fn unary(&mut self) -> RoxResult<()> {
         let kind = self.previous.kind();
 
         self.parse_precedence(Precedence::Unary)?;
@@ -182,7 +182,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         Ok(())
     }
 
-    fn number(&mut self) -> Result<(), RoxError> {
+    fn number(&mut self) -> RoxResult<()> {
         match self.previous.lexeme().parse::<f64>() {
             Ok(value) => {
                 self.emit_constant(Value::Number(value))?;
@@ -250,7 +250,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.current_chunk().write(instruction, line);
     }
 
-    fn emit_constant(&mut self, value: Value) -> Result<(), RoxError> {
+    fn emit_constant(&mut self, value: Value) -> RoxResult<()> {
         let index = self.make_constant(value)?;
         self.emit(Instruction::Constant(index));
 
@@ -272,7 +272,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.emit_return();
     }
 
-    fn make_constant(&mut self, value: Value) -> Result<u16, RoxError> {
+    fn make_constant(&mut self, value: Value) -> RoxResult<u16> {
         match self.current_chunk().add_constant(value) {
             Ok(index) => Ok(index),
             Err(_) => Err(self.error(CompilationError::TooManyConstants(u16::MAX as u64))),
@@ -283,7 +283,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         self.chunks.last_mut().unwrap()
     }
 
-    fn consume(&mut self, kind: TokenKind, error: CompilationError) -> Result<(), RoxError> {
+    fn consume(&mut self, kind: TokenKind, error: CompilationError) -> RoxResult<()> {
         if self.current.kind() == kind {
             self.advance()?;
             return Ok(());
@@ -292,7 +292,7 @@ impl<'sourcecode> Parser<'sourcecode> {
         Err(self.error_at_current(error))
     }
 
-    fn advance(&mut self) -> Result<(), RoxError> {
+    fn advance(&mut self) -> RoxResult<()> {
         self.previous = self.current;
 
         if let Some(token) = self.scanner.next() {
