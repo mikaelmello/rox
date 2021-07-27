@@ -163,6 +163,12 @@ impl<'sourcecode> Parser<'sourcecode> {
             TokenKind::Minus => self.emit(Instruction::Subtract),
             TokenKind::Star => self.emit(Instruction::Multiply),
             TokenKind::Slash => self.emit(Instruction::Divide),
+            TokenKind::BangEqual => self.emit_many(&[Instruction::Equal, Instruction::Not]),
+            TokenKind::EqualEqual => self.emit(Instruction::Equal),
+            TokenKind::Greater => self.emit(Instruction::Greater),
+            TokenKind::GreaterEqual => self.emit_many(&[Instruction::Less, Instruction::Not]),
+            TokenKind::Less => self.emit(Instruction::Less),
+            TokenKind::LessEqual => self.emit_many(&[Instruction::Greater, Instruction::Not]),
             _ => panic!("Invalid binary operator"),
         }
 
@@ -176,7 +182,19 @@ impl<'sourcecode> Parser<'sourcecode> {
 
         match kind {
             TokenKind::Minus => self.emit(Instruction::Negate),
+            TokenKind::Bang => self.emit(Instruction::Not),
             _ => panic!("Invalid unary operator"),
+        }
+
+        Ok(())
+    }
+
+    fn literal(&mut self) -> RoxResult<()> {
+        match self.previous.kind() {
+            TokenKind::False => self.emit(Instruction::False),
+            TokenKind::True => self.emit(Instruction::True),
+            TokenKind::Nil => self.emit(Instruction::Nil),
+            _ => panic!("Invalid literal token"),
         }
 
         Ok(())
@@ -211,31 +229,31 @@ impl<'sourcecode> Parser<'sourcecode> {
             TokenKind::Semicolon => (None, None, Precedence::None),
             TokenKind::Slash => (None, Some(Self::binary), Precedence::Factor),
             TokenKind::Star => (None, Some(Self::binary), Precedence::Factor),
-            TokenKind::Bang => (None, None, Precedence::None),
-            TokenKind::BangEqual => (None, None, Precedence::None),
+            TokenKind::Bang => (Some(Self::unary), None, Precedence::None),
+            TokenKind::BangEqual => (None, Some(Self::binary), Precedence::Equality),
             TokenKind::Equal => (None, None, Precedence::None),
-            TokenKind::EqualEqual => (None, None, Precedence::None),
-            TokenKind::Greater => (None, None, Precedence::None),
-            TokenKind::GreaterEqual => (None, None, Precedence::None),
-            TokenKind::Less => (None, None, Precedence::None),
-            TokenKind::LessEqual => (None, None, Precedence::None),
+            TokenKind::EqualEqual => (None, Some(Self::binary), Precedence::Equality),
+            TokenKind::Greater => (None, Some(Self::binary), Precedence::Comparison),
+            TokenKind::GreaterEqual => (None, Some(Self::binary), Precedence::Comparison),
+            TokenKind::Less => (None, Some(Self::binary), Precedence::Comparison),
+            TokenKind::LessEqual => (None, Some(Self::binary), Precedence::Comparison),
             TokenKind::Identifier => (None, None, Precedence::None),
             TokenKind::String => (None, None, Precedence::None),
             TokenKind::Number => (Some(Self::number), None, Precedence::None),
             TokenKind::And => (None, None, Precedence::None),
             TokenKind::Class => (None, None, Precedence::None),
             TokenKind::Else => (None, None, Precedence::None),
-            TokenKind::False => (None, None, Precedence::None),
+            TokenKind::False => (Some(Self::literal), None, Precedence::None),
             TokenKind::Fun => (None, None, Precedence::None),
             TokenKind::For => (None, None, Precedence::None),
             TokenKind::If => (None, None, Precedence::None),
-            TokenKind::Nil => (None, None, Precedence::None),
+            TokenKind::Nil => (Some(Self::literal), None, Precedence::None),
             TokenKind::Or => (None, None, Precedence::None),
             TokenKind::Print => (None, None, Precedence::None),
             TokenKind::Return => (None, None, Precedence::None),
             TokenKind::Super => (None, None, Precedence::None),
             TokenKind::This => (None, None, Precedence::None),
-            TokenKind::True => (None, None, Precedence::None),
+            TokenKind::True => (Some(Self::literal), None, Precedence::None),
             TokenKind::Var => (None, None, Precedence::None),
             TokenKind::While => (None, None, Precedence::None),
             TokenKind::Error(_) => (None, None, Precedence::None),
@@ -248,6 +266,12 @@ impl<'sourcecode> Parser<'sourcecode> {
     fn emit(&mut self, instruction: Instruction) {
         let line = self.previous.location().line();
         self.current_chunk().write(instruction, line);
+    }
+
+    fn emit_many(&mut self, instructions: &[Instruction]) {
+        for inst in instructions {
+            self.emit(*inst);
+        }
     }
 
     fn emit_constant(&mut self, value: Value) -> RoxResult<()> {

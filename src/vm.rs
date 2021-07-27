@@ -44,7 +44,7 @@ impl Vm {
             self.ip = self.ip.saturating_add(1);
 
             macro_rules! binary_op {
-                ($oper:tt) => {{
+                ($oper:tt,$type:tt) => {{
                     let b = match self.stack.pop() {
                         Some(Value::Number(val)) => val,
                         Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
@@ -56,7 +56,7 @@ impl Vm {
                         None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                     };
                     let res = a $oper b;
-                    self.stack.push(Value::Number(res));
+                    self.stack.push(Value::$type(res));
                 }};
             }
 
@@ -83,10 +83,31 @@ impl Vm {
                     Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
                     None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                 },
-                Instruction::Add => binary_op!(+),
-                Instruction::Subtract => binary_op!(-),
-                Instruction::Multiply => binary_op!(*),
-                Instruction::Divide => binary_op!(/),
+                Instruction::Add => binary_op!(+, Number),
+                Instruction::Subtract => binary_op!(-, Number),
+                Instruction::Multiply => binary_op!(*, Number),
+                Instruction::Divide => binary_op!(/, Number),
+                Instruction::Greater => binary_op!(>, Bool),
+                Instruction::Less => binary_op!(<, Bool),
+                Instruction::False => self.stack.push(Value::Bool(false)),
+                Instruction::True => self.stack.push(Value::Bool(true)),
+                Instruction::Nil => self.stack.push(Value::Nil),
+                Instruction::Not => match self.stack.pop() {
+                    Some(val) => self.stack.push(Value::Bool(val.is_falsey())),
+                    None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
+                },
+                Instruction::Equal => {
+                    let b = match self.stack.pop() {
+                        Some(val) => val,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
+                    };
+                    let a = match self.stack.pop() {
+                        Some(val) => val,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
+                    };
+                    let res = a == b;
+                    self.stack.push(Value::Bool(res));
+                }
             }
         }
     }

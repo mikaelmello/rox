@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, ops};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
@@ -9,6 +9,13 @@ pub enum Instruction {
     Subtract,
     Multiply,
     Divide,
+    False,
+    Nil,
+    True,
+    Not,
+    Equal,
+    Greater,
+    Less,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -16,6 +23,16 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     Nil,
+}
+
+impl Value {
+    pub fn is_falsey(&self) -> bool {
+        match self {
+            Value::Number(_) => false,
+            Value::Bool(val) => !val,
+            Value::Nil => true,
+        }
+    }
 }
 
 pub struct LineStart {

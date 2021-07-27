@@ -39,6 +39,13 @@ impl<'vm> Disassembler<'vm> {
             Instruction::Subtract => self.simple_instruction("OP_SUB"),
             Instruction::Multiply => self.simple_instruction("OP_MUL"),
             Instruction::Divide => self.simple_instruction("OP_DIV"),
+            Instruction::False => self.simple_instruction("OP_FALSE"),
+            Instruction::Nil => self.simple_instruction("OP_NIL"),
+            Instruction::True => self.simple_instruction("OP_TRUE"),
+            Instruction::Not => self.simple_instruction("OP_NOT"),
+            Instruction::Equal => self.simple_instruction("OP_EQUAL"),
+            Instruction::Greater => self.simple_instruction("OP_GREATER"),
+            Instruction::Less => self.simple_instruction("OP_LESS"),
         }
     }
 
