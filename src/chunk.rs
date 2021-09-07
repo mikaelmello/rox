@@ -1,4 +1,6 @@
-use std::{convert::TryFrom, ops};
+use std::convert::TryFrom;
+
+use crate::heap::Ref;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
@@ -18,11 +20,12 @@ pub enum Instruction {
     Less,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub enum Value {
     Number(f64),
     Bool(bool),
     Nil,
+    String(Ref<String>),
 }
 
 impl Value {
@@ -31,6 +34,7 @@ impl Value {
             Value::Number(_) => false,
             Value::Bool(val) => !val,
             Value::Nil => true,
+            Value::String(_) => false,
         }
     }
 }

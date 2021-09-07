@@ -2,6 +2,7 @@ use crate::{
     chunk::{Chunk, Instruction, Value},
     debug::Disassembler,
     error::{CompilationError, RoxError, RoxErrorKind, RoxResult},
+    heap::Heap,
     scanner::{scanner::TokenIter, token::TokenErrorKind, Scanner, Token, TokenKind},
 };
 
@@ -73,18 +74,20 @@ struct Parser<'sourcecode> {
     scanner: TokenIter<'sourcecode>,
     current: Token<'sourcecode>,
     previous: Token<'sourcecode>,
+    heap: &'sourcecode mut Heap,
     chunks: Vec<Chunk>,
     errors: Vec<RoxError>,
 }
 
 impl<'sourcecode> Parser<'sourcecode> {
-    pub fn new(code: &'sourcecode str) -> Self {
+    pub fn new(code: &'sourcecode str, heap: &'sourcecode mut Heap) -> Self {
         Self {
             scanner: Scanner::new(code).into_iter(),
             previous: Token::synthetic(""),
             current: Token::synthetic(""),
             chunks: Vec::new(),
             errors: Vec::new(),
+            heap,
         }
     }
 
@@ -201,6 +204,8 @@ impl<'sourcecode> Parser<'sourcecode> {
     }
 
     fn number(&mut self) -> RoxResult<()> {
+        assert!(matches!(self.previous.kind(), TokenKind::Number));
+
         match self.previous.lexeme().parse::<f64>() {
             Ok(value) => {
                 self.emit_constant(Value::Number(value))?;
@@ -210,6 +215,18 @@ impl<'sourcecode> Parser<'sourcecode> {
                 self.previous.lexeme().into(),
             ))),
         }
+    }
+
+    fn string(&mut self) -> RoxResult<()> {
+        assert!(matches!(self.previous.kind(), TokenKind::String));
+
+        let lexeme = self.previous.lexeme();
+        let value = &lexeme[1..(lexeme.len() - 1)];
+
+        let reference = self.heap.alloc_string(String::from(value));
+        self.emit_constant(Value::String(reference))?;
+
+        Ok(())
     }
 
     fn get_rule(&mut self, kind: TokenKind) -> ParseRule<'sourcecode> {
@@ -238,7 +255,7 @@ impl<'sourcecode> Parser<'sourcecode> {
             TokenKind::Less => (None, Some(Self::binary), Precedence::Comparison),
             TokenKind::LessEqual => (None, Some(Self::binary), Precedence::Comparison),
             TokenKind::Identifier => (None, None, Precedence::None),
-            TokenKind::String => (None, None, Precedence::None),
+            TokenKind::String => (Some(Self::string), None, Precedence::None),
             TokenKind::Number => (Some(Self::number), None, Precedence::None),
             TokenKind::And => (None, None, Precedence::None),
             TokenKind::Class => (None, None, Precedence::None),
@@ -357,6 +374,6 @@ impl<'sourcecode> Parser<'sourcecode> {
     }
 }
 
-pub fn compile(code: &str) -> Result<Chunk, Vec<RoxError>> {
-    Parser::new(code).compile()
+pub fn compile(code: &str, heap: &mut Heap) -> Result<Chunk, Vec<RoxError>> {
+    Parser::new(code, heap).compile()
 }

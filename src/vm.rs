@@ -3,6 +3,7 @@ use crate::{
     compiler::compile,
     debug::Disassembler,
     error::{RoxError, RoxErrorKind, RoxResult, RuntimeError},
+    heap::Heap,
 };
 use core::panic;
 
@@ -10,6 +11,7 @@ pub struct Vm {
     ip: usize,
     chunk: Chunk,
     stack: Vec<Value>,
+    heap: Heap,
 }
 
 impl Vm {
@@ -18,11 +20,12 @@ impl Vm {
             chunk,
             ip: 0,
             stack: Vec::new(),
+            heap: Heap::new(),
         }
     }
 
     pub fn interpret(&mut self, code: &str) -> Result<(), Vec<RoxError>> {
-        self.chunk = compile(code)?;
+        self.chunk = compile(code, &mut self.heap)?;
         self.ip = 0;
 
         self.run().map_err(|err| vec![err])
@@ -63,7 +66,10 @@ impl Vm {
             match inst {
                 Instruction::Return => {
                     if let Some(val) = self.stack.pop() {
-                        println!("{:?}", val);
+                        match val {
+                            Value::String(val) => println!("String({})", self.heap.deref(val)),
+                            val => println!("{:?}", val),
+                        }
                     }
 
                     return Ok(());
@@ -83,7 +89,26 @@ impl Vm {
                     Some(_) => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
                     None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                 },
-                Instruction::Add => binary_op!(+, Number),
+                Instruction::Add => {
+                    let b = match self.stack.pop() {
+                        Some(val) => val,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
+                    };
+                    let a = match self.stack.pop() {
+                        Some(val) => val,
+                        None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
+                    };
+                    let res = match (a, b) {
+                        (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
+                        (Value::String(a), Value::String(b)) => {
+                            let result = format!("{}{}", self.heap.deref(a), self.heap.deref(b));
+                            let result = self.heap.alloc_string(result);
+                            Value::String(result)
+                        }
+                        _ => Err(self.runtime_error(RuntimeError::InvalidOperand))?,
+                    };
+                    self.stack.push(res);
+                }
                 Instruction::Subtract => binary_op!(-, Number),
                 Instruction::Multiply => binary_op!(*, Number),
                 Instruction::Divide => binary_op!(/, Number),
@@ -105,8 +130,17 @@ impl Vm {
                         Some(val) => val,
                         None => Err(self.runtime_error(RuntimeError::MissingOperand))?,
                     };
-                    let res = a == b;
-                    self.stack.push(Value::Bool(res));
+
+                    let equals = match (a, b) {
+                        (Value::Number(a), Value::Number(b)) => a == b,
+                        (Value::Bool(a), Value::Bool(b)) => a == b,
+                        (Value::Nil, Value::Nil) => true,
+                        (Value::String(a), Value::String(b)) => {
+                            self.heap.deref(a) == self.heap.deref(b)
+                        }
+                        _ => false,
+                    };
+                    self.stack.push(Value::Bool(equals));
                 }
             }
         }

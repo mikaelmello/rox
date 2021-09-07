@@ -112,6 +112,8 @@ impl<'sourcecode> Scanner<'sourcecode> {
             self.advance();
         }
 
+        let x = 3 u64;
+
         if self.is_at_end() {
             self.error_token(TokenErrorKind::UnterminatedString)
         } else {
